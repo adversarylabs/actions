@@ -1,0 +1,96 @@
+name: Publish Adversary
+description: Validate, package, and publish an adversary with a pinned Adversary CLI release.
+
+inputs:
+  cli-version:
+    description: Exact Adversary CLI release tag to install, for example 2026.7.9-beta.1.
+    required: true
+  path:
+    description: Path to the adversary project, relative to the workspace.
+    required: false
+    default: .
+  builder:
+    description: Package builder to use (local or docker).
+    required: false
+    default: local
+  install-dependencies:
+    description: Install locked project dependencies before local packaging (true or false). Disable when dependencies are preinstalled or builder is docker.
+    required: false
+    default: "true"
+  name:
+    description: Optional local artifact name override passed to adversary pack.
+    required: false
+  remote-reference:
+    description: Optional fully qualified destination. When omitted, the authenticated Adversary Labs namespace is used.
+    required: false
+  api-url:
+    description: Adversary Labs API URL.
+    required: false
+    default: https://adversarylabs.ai/api
+  profile:
+    description: CLI credential profile used for login and push.
+    required: false
+    default: github-actions
+  email-address:
+    description: Account email used with password to request a short-lived CI credential. Omit both to use preconfigured or Docker registry credentials.
+    required: false
+  password:
+    description: Account password used only through login --password-stdin. Pass a GitHub Actions secret.
+    required: false
+  registry-host:
+    description: Optional OCI registry host override.
+    required: false
+  registry-namespace:
+    description: Optional default OCI namespace override.
+    required: false
+
+outputs:
+  reference:
+    description: Canonical remote reference published by the registry.
+    value: ${{ steps.publish.outputs.reference }}
+  digest:
+    description: Published OCI image manifest digest.
+    value: ${{ steps.publish.outputs.digest }}
+  manifest-digest:
+    description: Published adversary manifest referrer digest.
+    value: ${{ steps.publish.outputs.manifest-digest }}
+  local-reference:
+    description: Local canonical reference produced by packaging.
+    value: ${{ steps.package.outputs.local-reference }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Adversary CLI
+      shell: bash
+      env:
+        INPUT_CLI_VERSION: ${{ inputs.cli-version }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+
+    - name: Validate and package
+      id: package
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_BUILDER: ${{ inputs.builder }}
+        INPUT_INSTALL_DEPENDENCIES: ${{ inputs.install-dependencies }}
+        INPUT_NAME: ${{ inputs.name }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/package.sh"
+
+    - name: Authenticate and publish
+      id: publish
+      shell: bash
+      env:
+        INPUT_LOCAL_REFERENCE: ${{ steps.package.outputs.local-reference }}
+        INPUT_REMOTE_REFERENCE: ${{ inputs.remote-reference }}
+        INPUT_API_URL: ${{ inputs.api-url }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_EMAIL_ADDRESS: ${{ inputs.email-address }}
+        INPUT_PASSWORD: ${{ inputs.password }}
+        INPUT_REGISTRY_HOST: ${{ inputs.registry-host }}
+        INPUT_REGISTRY_NAMESPACE: ${{ inputs.registry-namespace }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/push.sh"
+
+branding:
+  icon: upload-cloud
+  color: purple
