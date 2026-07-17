@@ -24,8 +24,16 @@ if [[ "$install_dependencies" == true && "$builder" == local ]]; then
   if [[ -f "$project_path/package-lock.json" ]]; then
     (cd "$project_path" && npm ci)
   elif [[ -f "$project_path/pnpm-lock.yaml" ]]; then
+    if ! command -v corepack >/dev/null 2>&1; then
+      echo "Installing pnpm dependencies requires Corepack. Install Corepack before running this action, or set install-dependencies: false." >&2
+      exit 2
+    fi
     (cd "$project_path" && corepack pnpm install --frozen-lockfile)
   elif [[ -f "$project_path/yarn.lock" ]]; then
+    if ! command -v corepack >/dev/null 2>&1; then
+      echo "Installing Yarn dependencies requires Corepack. Install Corepack before running this action, or set install-dependencies: false." >&2
+      exit 2
+    fi
     (cd "$project_path" && corepack yarn install --frozen-lockfile)
   else
     echo "Local packaging requires a supported lockfile (package-lock.json, pnpm-lock.yaml, or yarn.lock), or install-dependencies: false." >&2
@@ -51,4 +59,3 @@ print(value)
 PY
 )"
 printf 'local-reference=%s\n' "$local_reference" >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
-
