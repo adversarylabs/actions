@@ -30,13 +30,18 @@ inputs:
   profile:
     description: CLI credential profile used for login and push.
     required: false
-    default: github-actions
-  email-address:
-    description: Account email used with password to request a short-lived CI credential. Omit both to use preconfigured or Docker registry credentials.
+    default: publish-action
+  auth-mode:
+    description: Authentication mode (token, oauth, or existing). Token is recommended for CI; OAuth uses interactive device login.
     required: false
-  password:
-    description: Account password used only through login --password-stdin. Pass a GitHub Actions secret.
+    default: token
+  token:
+    description: Service account token used by token authentication. Pass a Depot CI or GitHub Actions secret.
     required: false
+  client-name:
+    description: Name shown while approving the OAuth device login.
+    required: false
+    default: Adversary publish action
   registry-host:
     description: Optional OCI registry host override.
     required: false
@@ -85,8 +90,9 @@ runs:
         INPUT_REMOTE_REFERENCE: ${{ inputs.remote-reference }}
         INPUT_API_URL: ${{ inputs.api-url }}
         INPUT_PROFILE: ${{ inputs.profile }}
-        INPUT_EMAIL_ADDRESS: ${{ inputs.email-address }}
-        INPUT_PASSWORD: ${{ inputs.password }}
+        INPUT_AUTH_MODE: ${{ inputs.auth-mode }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_CLIENT_NAME: ${{ inputs.client-name }}
         INPUT_REGISTRY_HOST: ${{ inputs.registry-host }}
         INPUT_REGISTRY_NAMESPACE: ${{ inputs.registry-namespace }}
       run: bash "$GITHUB_ACTION_PATH/scripts/push.sh"

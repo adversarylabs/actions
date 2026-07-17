@@ -2,13 +2,18 @@
 set -euo pipefail
 
 local_reference="${INPUT_LOCAL_REFERENCE:?local package reference is required}"
-profile="${INPUT_PROFILE:-github-actions}"
+profile="${INPUT_PROFILE:-publish-action}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
-email="${INPUT_EMAIL_ADDRESS:-}"
-password="${INPUT_PASSWORD:-}"
+auth_mode="${INPUT_AUTH_MODE:-token}"
+client_name="${INPUT_CLIENT_NAME:-Adversary publish action}"
+token="${INPUT_TOKEN:-}"
 
-if [[ -n "$email" && -z "$password" || -z "$email" && -n "$password" ]]; then
-  echo "email-address and password must be provided together." >&2
+case "$auth_mode" in
+  token|oauth|existing) ;;
+  *) echo "auth-mode must be token, oauth, or existing" >&2; exit 2 ;;
+esac
+if [[ "$auth_mode" != token && -n "$token" ]]; then
+  echo "token can only be used with auth-mode: token" >&2
   exit 2
 fi
 
@@ -16,10 +21,27 @@ export ADVERSARY_API_URL="$api_url"
 if [[ -n "${INPUT_REGISTRY_HOST:-}" ]]; then export ADVERSARY_REGISTRY_HOST="$INPUT_REGISTRY_HOST"; fi
 if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then export ADVERSARY_REGISTRY_NAMESPACE="$INPUT_REGISTRY_NAMESPACE"; fi
 
-if [[ -n "$password" ]]; then
-  printf '%s\n' "$password" | env -u INPUT_PASSWORD adversary --profile "$profile" login --ci --email-address "$email" --password-stdin
-  password=''
-  unset INPUT_PASSWORD
+if [[ "$auth_mode" == token ]]; then
+  if [[ -z "$token" ]]; then
+    echo "token is required with auth-mode: token" >&2
+    exit 2
+  fi
+  if [[ "$token" != adv_sa_* ]]; then
+    echo "token must be an Adversary Labs service account token" >&2
+    exit 2
+  fi
+  if [[ -z "${INPUT_REGISTRY_NAMESPACE:-}" && -z "${INPUT_REMOTE_REFERENCE:-}" ]]; then
+    echo "registry-namespace or remote-reference is required with auth-mode: token" >&2
+    exit 2
+  fi
+  login_args=(--profile "$profile" login --token-stdin)
+  if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then login_args+=(--registry-namespace "$INPUT_REGISTRY_NAMESPACE"); fi
+  printf '%s\n' "$token" | env -u INPUT_TOKEN adversary "${login_args[@]}"
+  token=''
+  unset INPUT_TOKEN
+  trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
+elif [[ "$auth_mode" == oauth ]]; then
+  adversary --profile "$profile" login --ci --name "$client_name"
   trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
 fi
 

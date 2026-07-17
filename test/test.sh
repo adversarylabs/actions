@@ -11,9 +11,15 @@ bash -n "$root/publish/scripts/push.sh"
 grep -Fq 'using: composite' "$root/publish/action.yml"
 grep -Fq 'cli-version:' "$root/publish/action.yml"
 grep -Fq 'install-dependencies:' "$root/publish/action.yml"
+grep -Fq 'auth-mode:' "$root/publish/action.yml"
+grep -Fq 'token:' "$root/publish/action.yml"
+if grep -Eq 'email-address:|INPUT_EMAIL_ADDRESS|password:|INPUT_PASSWORD' "$root/publish/action.yml"; then
+  echo "action metadata still exposes password authentication" >&2
+  exit 1
+fi
 package_step="$(sed -n '/- name: Validate and package/,/- name: Authenticate and publish/p' "$root/publish/action.yml")"
-if grep -Fq 'INPUT_PASSWORD' <<<"$package_step"; then
-  echo "action metadata exposes the publication password to the package step" >&2
+if grep -Eq 'INPUT_AUTH_MODE|INPUT_TOKEN' <<<"$package_step"; then
+  echo "action metadata mixes authentication into the package step" >&2
   exit 1
 fi
 
@@ -64,13 +70,20 @@ set -euo pipefail
 profile=default
 if [[ "${1:-}" == --profile ]]; then profile="$2"; shift 2; fi
 command="$1"; shift
-if [[ -n "${INPUT_PASSWORD:-}" ]]; then
-  echo "$command received the publication password in its environment" >&2
+if [[ -n "${INPUT_TOKEN:-}" ]]; then
+  echo "$command received the service account token in its environment" >&2
   exit 88
 fi
 printf '%s profile=%s args=%s\n' "$command" "$profile" "$*" >>"$FAKE_LOG"
 case "$command" in
-  login) IFS= read -r supplied; [[ "$supplied" == "$EXPECTED_PASSWORD" ]] ;;
+  login)
+    if [[ "$*" == '--token-stdin --registry-namespace adversarylabs' ]]; then
+      IFS= read -r supplied
+      [[ "$supplied" == "$EXPECTED_TOKEN" ]]
+    else
+      [[ "$*" == '--ci --name GitHub Actions' ]]
+    fi
+    ;;
   logout) [[ "$1" == --local-only ]] ;;
   validate) [[ "$1" == project ]] ;;
   pack) printf '%s\n' '{"schemaVersion":2,"command":"pack","data":{"canonicalReference":"example:1.0.0"}}' ;;
@@ -83,10 +96,6 @@ chmod +x "$fake_bin/adversary"
 cat >"$fake_bin/npm" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ -n "${INPUT_PASSWORD:-}" ]]; then
-  echo "package step received the publication password" >&2
-  exit 88
-fi
 printf 'npm args=%s\n' "$*" >>"$FAKE_LOG"
 FAKE
 chmod +x "$fake_bin/npm"
@@ -106,28 +115,36 @@ grep -Fq 'npm args=ci' "$log"
 grep -Fq 'pack profile=default args=project --builder local --format json' "$log"
 grep -Fq 'local-reference=example:1.0.0' "$package_output"
 
-PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_PASSWORD='do-not-print-me' \
-  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" INPUT_LOCAL_REFERENCE=example:1.0.0 \
-  INPUT_PROFILE=release INPUT_API_URL=https://api.example INPUT_EMAIL_ADDRESS=author@example.com \
-  INPUT_PASSWORD='do-not-print-me' INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
-  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
+PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash "$root/publish/scripts/push.sh" >"$tmp/publish-stdout"
 
-grep -Fq 'login profile=release' "$log"
+grep -Fq 'login profile=release args=--token-stdin --registry-namespace adversarylabs' "$log"
 grep -Fq 'push profile=release args=example:1.0.0 registry.example/team/example:1.0.0 --format json' "$log"
 grep -Fq 'logout profile=release args=--local-only' "$log"
-if grep -Fq 'do-not-print-me' "$log" "$tmp/publish-stdout" "$package_output" "$push_output"; then
-  echo "password leaked into action output" >&2
-  exit 1
-fi
 grep -Fq 'reference=registry.example/team/example:1.0.0' "$push_output"
 grep -Fq 'digest=sha256:image' "$push_output"
 grep -Fq 'manifest-digest=sha256:manifest' "$push_output"
+if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/publish-stdout" "$package_output" "$push_output"; then
+  echo "service account token leaked into action output" >&2
+  exit 1
+fi
 
 if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
-  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_EMAIL_ADDRESS=author@example.com INPUT_PASSWORD='' \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=invalid \
   bash "$root/publish/scripts/push.sh" >/dev/null 2>&1; then
-  echo "publish accepted incomplete credentials" >&2
+  echo "publish accepted an invalid auth mode" >&2
+  exit 1
+fi
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=token INPUT_TOKEN='' \
+  INPUT_REGISTRY_NAMESPACE=adversarylabs bash "$root/publish/scripts/push.sh" >/dev/null 2>&1; then
+  echo "publish accepted token authentication without a token" >&2
   exit 1
 fi
 
