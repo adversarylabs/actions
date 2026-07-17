@@ -102,7 +102,7 @@ Set `auth-mode: existing` to skip login. This supports a runner with a preconfig
 
 ## Development
 
-Run the deterministic shell tests locally:
+Run the deterministic shell test suite locally:
 
 ```bash
 bash test/test.sh
