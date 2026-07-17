@@ -26,7 +26,7 @@ fi
 case "$(uname -s)" in Linux) os=linux ;; Darwin) os=darwin ;; *) echo "unsupported test OS" >&2; exit 1 ;; esac
 case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *) echo "unsupported test architecture" >&2; exit 1 ;; esac
 
-version=1.2.3
+version=1.2.3-rc-1+build.5
 release="$tmp/release"
 mkdir -p "$release/archive"
 printf '#!/usr/bin/env bash\necho "adversary test-version"\n' >"$release/archive/adversary"
@@ -38,7 +38,7 @@ if command -v sha256sum >/dev/null 2>&1; then
 else
   checksum="$(shasum -a 256 "$release/$archive" | awk '{print $1}')"
 fi
-printf '%s  %s\n' "$checksum" "$archive" >"$release/checksums.txt"
+printf '%s *%s\n' "$checksum" "$archive" >"$release/checksums.txt"
 
 runner="$tmp/runner"
 mkdir -p "$runner"
@@ -48,6 +48,10 @@ INPUT_CLI_VERSION="$version" RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
 installed="$(tail -n 1 "$github_path")/adversary"
 [[ -x "$installed" ]]
 [[ "$("$installed" version)" == "adversary test-version" ]]
+
+printf 'SHA256 (%s) = %s\n' "$archive" "$checksum" >"$release/checksums.txt"
+INPUT_CLI_VERSION="$version" RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
+  ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/publish/scripts/install.sh" >/dev/null
 
 if INPUT_CLI_VERSION=latest RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/publish/scripts/install.sh" >/dev/null 2>&1; then
@@ -83,9 +87,10 @@ case "$command" in
     else
       [[ "$*" == '--ci --name GitHub Actions' ]]
     fi
+    if [[ "${FAIL_LOGIN:-false}" == true ]]; then exit 7; fi
     ;;
   logout) [[ "$1" == --local-only ]] ;;
-  validate) [[ "$1" == project ]] ;;
+  validate) [[ "$1" == project || "$1" == project-pnpm ]] ;;
   pack) printf '%s\n' '{"schemaVersion":2,"command":"pack","data":{"canonicalReference":"example:1.0.0"}}' ;;
   push) printf '%s\n' '{"schemaVersion":1,"command":"push","data":{"canonicalReference":"registry.example/team/example:1.0.0","digest":"sha256:image","manifestDigest":"sha256:manifest"}}' ;;
   *) echo "unexpected command: $command" >&2; exit 9 ;;
@@ -115,6 +120,18 @@ grep -Fq 'npm args=ci' "$log"
 grep -Fq 'pack profile=default args=project --builder local --format json' "$log"
 grep -Fq 'local-reference=example:1.0.0' "$package_output"
 
+mkdir -p "$tmp/work/project-pnpm" "$tmp/no-corepack-bin"
+touch "$tmp/work/project-pnpm/pnpm-lock.yaml"
+ln -s "$(command -v bash)" "$tmp/no-corepack-bin/bash"
+if PATH="$fake_bin:$tmp/no-corepack-bin" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$package_output" \
+  INPUT_PATH=project-pnpm INPUT_BUILDER=local INPUT_INSTALL_DEPENDENCIES=true INPUT_NAME='' \
+  "$tmp/no-corepack-bin/bash" -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/publish/scripts/package.sh" \
+  >"$tmp/corepack-stdout" 2>"$tmp/corepack-stderr"; then
+  echo "package install accepted pnpm without Corepack" >&2
+  exit 1
+fi
+grep -Fq 'Installing pnpm dependencies requires Corepack.' "$tmp/corepack-stderr"
+
 PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
   RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
   INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
@@ -131,6 +148,47 @@ grep -Fq 'digest=sha256:image' "$push_output"
 grep -Fq 'manifest-digest=sha256:manifest' "$push_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/publish-stdout" "$package_output" "$push_output"; then
   echo "service account token leaked into action output" >&2
+  exit 1
+fi
+
+existing_log="$tmp/existing.log"
+existing_output="$tmp/existing-output"
+PATH="$fake_bin:$PATH" FAKE_LOG="$existing_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$existing_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE='' INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=existing INPUT_TOKEN='' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
+  bash "$root/publish/scripts/push.sh" >/dev/null
+grep -Fq 'push profile=default args=example:1.0.0 registry.example/team/example:1.0.0 --format json' "$existing_log"
+if grep -Eq '^(login|logout) ' "$existing_log"; then
+  echo "existing authentication unexpectedly changed CLI login state" >&2
+  exit 1
+fi
+
+explicit_profile_log="$tmp/explicit-profile.log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$explicit_profile_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$existing_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=preconfigured INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=existing INPUT_TOKEN='' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
+  bash "$root/publish/scripts/push.sh" >/dev/null
+grep -Fq 'push profile=preconfigured args=example:1.0.0 registry.example/team/example:1.0.0 --format json' "$explicit_profile_log"
+
+failed_login_log="$tmp/failed-login.log"
+if PATH="$fake_bin:$PATH" FAKE_LOG="$failed_login_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' FAIL_LOGIN=true \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash "$root/publish/scripts/push.sh" >"$tmp/failed-login-output" 2>&1; then
+  echo "publish continued after a failed login" >&2
+  exit 1
+fi
+grep -Fq 'login profile=release args=--token-stdin --registry-namespace adversarylabs' "$failed_login_log"
+grep -Fq 'logout profile=release args=--local-only' "$failed_login_log"
+if grep -Fq 'adv_sa_do-not-print-me' "$failed_login_log" "$tmp/failed-login-output"; then
+  echo "failed login leaked the service account token" >&2
   exit 1
 fi
 

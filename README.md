@@ -46,7 +46,7 @@ jobs:
         run: echo "Published ${{ steps.publish.outputs.reference }} at ${{ steps.publish.outputs.digest }}"
 ```
 
-`cli-version` is deliberately required and has no mutable default. Set `ADVERSARY_CLI_VERSION` to an exact CLI release containing service-account `--token-stdin` support. Pin the action itself to an exact release tag or full commit SHA. The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`; configure the matching Node runtime before invoking the action.
+`cli-version` is deliberately required and has no mutable default. Set `ADVERSARY_CLI_VERSION` to an exact CLI release containing service-account `--token-stdin` support. Pin the action itself to an exact release tag or full commit SHA. The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`; configure the matching Node runtime before invoking the action. pnpm and Yarn installs require Corepack, which is not bundled with Node.js 25 and later; install Corepack separately on those runtimes. For reproducible pnpm or Yarn installs, pin the exact tool version in the `packageManager` field of `package.json`.
 
 ### Authentication
 
@@ -54,7 +54,7 @@ The default `auth-mode: token` accepts an Adversary Labs service-account token. 
 
 For an interactive run, set `auth-mode: oauth`. The CLI prints a device-login URL and code and waits for approval through your normal OAuth login. The device request currently expires after ten minutes.
 
-Set `auth-mode: existing` to skip login. This supports a runner with a preconfigured CLI profile or an external OCI registry authenticated through Docker’s credential store. Use `remote-reference` for an explicit registry destination:
+Set `auth-mode: existing` to skip login. This supports a runner with a preconfigured CLI profile or an external OCI registry authenticated through Docker’s credential store. When `profile` is omitted, the action uses the CLI's default profile; set `profile` explicitly to use a different preconfigured profile. Use `remote-reference` for an explicit registry destination:
 
 ```yaml
 - uses: adversarylabs/actions/publish@v1.0.0
@@ -75,7 +75,7 @@ Set `auth-mode: existing` to skip login. This supports a runner with a preconfig
 | `name` | no | — | Local artifact-name override. |
 | `remote-reference` | no | — | Fully qualified OCI destination. |
 | `api-url` | no | hosted API | API endpoint used for login and registry token exchange. |
-| `profile` | no | `publish-action` | Isolated CLI credential profile. |
+| `profile` | no | `publish-action` for token/OAuth; CLI default for existing | CLI credential profile. |
 | `auth-mode` | no | `token` | `token` for a service account, `oauth` for device approval, or `existing` for preconfigured credentials. |
 | `token` | with token auth | — | Service-account token supplied through a Depot CI or GitHub Actions secret. |
 | `client-name` | no | `Adversary publish action` | Name shown on the OAuth device-approval screen. |
@@ -102,7 +102,7 @@ Set `auth-mode: existing` to skip login. This supports a runner with a preconfig
 
 ## Development
 
-Run the deterministic shell tests locally:
+Run the deterministic shell test suite locally:
 
 ```bash
 bash test/test.sh

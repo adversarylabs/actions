@@ -2,11 +2,12 @@
 set -euo pipefail
 
 local_reference="${INPUT_LOCAL_REFERENCE:?local package reference is required}"
-profile="${INPUT_PROFILE:-publish-action}"
+profile="${INPUT_PROFILE:-}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
 auth_mode="${INPUT_AUTH_MODE:-token}"
 client_name="${INPUT_CLIENT_NAME:-Adversary publish action}"
 token="${INPUT_TOKEN:-}"
+unset INPUT_TOKEN
 
 case "$auth_mode" in
   token|oauth|existing) ;;
@@ -15,6 +16,9 @@ esac
 if [[ "$auth_mode" != token && -n "$token" ]]; then
   echo "token can only be used with auth-mode: token" >&2
   exit 2
+fi
+if [[ -z "$profile" && "$auth_mode" != existing ]]; then
+  profile=publish-action
 fi
 
 export ADVERSARY_API_URL="$api_url"
@@ -36,19 +40,22 @@ if [[ "$auth_mode" == token ]]; then
   fi
   login_args=(--profile "$profile" login --token-stdin)
   if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then login_args+=(--registry-namespace "$INPUT_REGISTRY_NAMESPACE"); fi
-  printf '%s\n' "$token" | env -u INPUT_TOKEN adversary "${login_args[@]}"
+  trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
+  printf '%s\n' "$token" | adversary "${login_args[@]}"
   token=''
-  unset INPUT_TOKEN
-  trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
 elif [[ "$auth_mode" == oauth ]]; then
-  adversary --profile "$profile" login --ci --name "$client_name"
   trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
+  adversary --profile "$profile" login --ci --name "$client_name"
 fi
 
 push_output="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-push.json"
 push_args=(push "$local_reference" --format json)
 if [[ -n "${INPUT_REMOTE_REFERENCE:-}" ]]; then push_args=(push "$local_reference" "$INPUT_REMOTE_REFERENCE" --format json); fi
-adversary --profile "$profile" "${push_args[@]}" >"$push_output"
+if [[ -n "$profile" ]]; then
+  adversary --profile "$profile" "${push_args[@]}" >"$push_output"
+else
+  adversary "${push_args[@]}" >"$push_output"
+fi
 
 publication_values="${RUNNER_TEMP}/adversary-publication-values"
 python3 - "$push_output" >"$publication_values" <<'PY'

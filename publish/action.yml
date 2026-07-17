@@ -28,9 +28,8 @@ inputs:
     required: false
     default: https://adversarylabs.ai/api
   profile:
-    description: CLI credential profile used for login and push.
+    description: CLI credential profile. Defaults to publish-action for token and OAuth; existing mode uses the CLI default when omitted.
     required: false
-    default: publish-action
   auth-mode:
     description: Authentication mode (token, oauth, or existing). Token is recommended for CI; OAuth uses interactive device login.
     required: false
