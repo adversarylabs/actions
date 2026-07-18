@@ -1,0 +1,54 @@
+name: Version Adversary
+description: Synchronize adversary release metadata from a tag and commit it back idempotently.
+
+inputs:
+  tag:
+    description: Release tag in the form v followed by a semantic version.
+    required: true
+  path:
+    description: Path to the adversary project, relative to the workspace.
+    required: false
+    default: .
+  branch:
+    description: Branch that receives the release metadata commit.
+    required: false
+    default: main
+  token:
+    description: GitHub token with contents write permission for the target repository.
+    required: true
+  sync-npm:
+    description: Synchronize package.json and package-lock.json when present (auto, true, or false).
+    required: false
+    default: auto
+
+outputs:
+  name:
+    description: OCI-compatible adversary name read from adversary.yaml.
+    value: ${{ steps.version.outputs.name }}
+  version:
+    description: Semantic version derived from the release tag without its v prefix.
+    value: ${{ steps.version.outputs.version }}
+  changed:
+    description: Whether this invocation created and pushed a version commit.
+    value: ${{ steps.version.outputs.changed }}
+  commit:
+    description: Version bump commit, or the current target branch commit when no bump was needed.
+    value: ${{ steps.version.outputs.commit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Synchronize release metadata
+      id: version
+      shell: bash
+      env:
+        INPUT_TAG: ${{ inputs.tag }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_SYNC_NPM: ${{ inputs.sync-npm }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/version.sh"
+
+branding:
+  icon: tag
+  color: purple

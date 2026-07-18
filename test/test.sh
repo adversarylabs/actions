@@ -270,3 +270,4 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
 fi
 
 echo "publish action tests passed"
+bash "$root/test/version.sh"
