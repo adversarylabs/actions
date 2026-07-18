@@ -25,9 +25,10 @@ description: Test adversary.
 EOF
 cat >"$seed/package.json" <<'EOF'
 {
-  "name": "depotci",
-  "version": "0.1.0",
-  "private": true
+    "name" : "depotci",
+
+    "version" : "0.1.0",
+    "private" : true
 }
 EOF
 cat >"$seed/package-lock.json" <<'EOF'
@@ -70,6 +71,10 @@ bump_sha="$(sed -n 's/^commit=//p' "$first_output")"
 [[ "$(git --git-dir="$remote" show main:adversary.yaml | sed -n 's/^version:[[:space:]]*//p')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).version))')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package-lock.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).packages[""].version))')" == 0.0.2 ]]
+git --git-dir="$remote" show main:package.json | grep -Fq '    "name" : "depotci",'
+git --git-dir="$remote" show main:package.json | grep -Fq '    "version" : "0.0.2",'
+[[ "$(git -C "$seed" config --local user.name)" == test ]]
+[[ "$(git -C "$seed" config --local user.email)" == test@example.com ]]
 if grep -Fq 'github-do-not-print-me' "$first_log" "$first_output"; then
   echo "version action leaked its GitHub token" >&2
   exit 1

@@ -36,7 +36,16 @@ action_path="${GITHUB_ACTION_PATH:?GITHUB_ACTION_PATH is required}"
 output_path="${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 cd "$workspace"
 
-metadata_output="$runner_temp/adversary-version-metadata"
+branch_key="$(printf '%s' "$branch" | git hash-object --stdin)"
+work_temp="$(mktemp -d "$runner_temp/adversary-version-${branch_key}.XXXXXX")"
+credential_key="http.https://github.com/.extraheader"
+cleanup() {
+  git config --local --unset-all "$credential_key" >/dev/null 2>&1 || true
+  rm -rf -- "$work_temp"
+}
+trap cleanup EXIT
+
+metadata_output="$work_temp/metadata"
 node "$action_path/scripts/metadata.mjs" apply "$project_path" "$version" "$sync_npm" >"$metadata_output"
 name="$(sed -n '1p' "$metadata_output")"
 version_files=()
@@ -50,11 +59,6 @@ fi
 
 auth_header="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
 token=''
-credential_key="http.https://github.com/.extraheader"
-cleanup_credentials() {
-  git config --local --unset-all "$credential_key" >/dev/null 2>&1 || true
-}
-trap cleanup_credentials EXIT
 git config --local "$credential_key" "AUTHORIZATION: basic $auth_header"
 auth_header=''
 
@@ -69,10 +73,10 @@ if [[ "$tag_sha" == "$branch_sha" ]]; then
   if git diff --quiet -- "${version_files[@]}"; then
     echo "Release metadata is already at ${version}; no bump commit is needed."
   else
-    git config user.name "adversarylabs-release"
-    git config user.email "adversarylabs-release@users.noreply.github.com"
     git add "${version_files[@]}"
-    git commit -m "$message"
+    git -c user.name=adversarylabs-release \
+      -c user.email=adversarylabs-release@users.noreply.github.com \
+      commit -m "$message"
     commit="$(git rev-parse HEAD)"
     git push origin "HEAD:refs/heads/${branch}"
     changed=true
@@ -87,8 +91,7 @@ else
     exit 1
   fi
 
-  verify_root="$runner_temp/adversary-version-main"
-  rm -rf -- "$verify_root"
+  verify_root="$work_temp/branch"
   mkdir -p -- "$verify_root"
   for file in "${version_files[@]}"; do
     mkdir -p -- "$verify_root/$(dirname "$file")"
@@ -99,7 +102,7 @@ else
   echo "The ${version} release metadata bump is already on ${branch}; continuing this release rerun."
 fi
 
-cleanup_credentials
+cleanup
 trap - EXIT
 
 {

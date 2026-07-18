@@ -66,13 +66,126 @@ if (hasLock && !hasPackage) {
 
 const synchronizePackage = syncNpm === "true" || (syncNpm === "auto" && hasPackage)
 
+const locateJSONStringValues = (source, targetPaths) => {
+  const targets = new Set(targetPaths.map((path) => JSON.stringify(path)))
+  const locations = new Map()
+  let index = 0
+
+  const whitespace = () => {
+    while (/\s/.test(source[index] ?? "")) index += 1
+  }
+  const stringToken = () => {
+    whitespace()
+    if (source[index] !== '"') throw new Error("expected a JSON string")
+    const start = index
+    index += 1
+    while (index < source.length) {
+      if (source[index] === "\\") {
+        index += 2
+        continue
+      }
+      if (source[index] === '"') {
+        index += 1
+        const end = index
+        return { start, end, value: JSON.parse(source.slice(start, end)) }
+      }
+      index += 1
+    }
+    throw new Error("unterminated JSON string")
+  }
+  const value = (path) => {
+    whitespace()
+    if (source[index] === "{") {
+      index += 1
+      whitespace()
+      if (source[index] === "}") {
+        index += 1
+        return
+      }
+      while (index < source.length) {
+        const key = stringToken().value
+        whitespace()
+        if (source[index] !== ":") throw new Error("expected a JSON object colon")
+        index += 1
+        value([...path, key])
+        whitespace()
+        if (source[index] === "}") {
+          index += 1
+          return
+        }
+        if (source[index] !== ",") throw new Error("expected a JSON object comma")
+        index += 1
+      }
+      throw new Error("unterminated JSON object")
+    }
+    if (source[index] === "[") {
+      index += 1
+      whitespace()
+      if (source[index] === "]") {
+        index += 1
+        return
+      }
+      let item = 0
+      while (index < source.length) {
+        value([...path, String(item)])
+        item += 1
+        whitespace()
+        if (source[index] === "]") {
+          index += 1
+          return
+        }
+        if (source[index] !== ",") throw new Error("expected a JSON array comma")
+        index += 1
+      }
+      throw new Error("unterminated JSON array")
+    }
+    if (source[index] === '"') {
+      const token = stringToken()
+      const pathKey = JSON.stringify(path)
+      if (targets.has(pathKey)) {
+        if (locations.has(pathKey)) throw new Error(`duplicate JSON path: ${path.join(".")}`)
+        locations.set(pathKey, token)
+      }
+      return
+    }
+
+    const start = index
+    while (index < source.length && !/[\s,}\]]/.test(source[index])) index += 1
+    if (start === index) throw new Error("expected a JSON value")
+    JSON.parse(source.slice(start, index))
+  }
+
+  value([])
+  whitespace()
+  if (index !== source.length) throw new Error("unexpected data after JSON document")
+  return locations
+}
+
+const replaceJSONStringValues = (source, replacements) => {
+  const locations = locateJSONStringValues(source, [...replacements.keys()])
+  const edits = []
+  for (const [path, replacement] of replacements) {
+    const location = locations.get(JSON.stringify(path))
+    if (!location) throw new Error(`JSON string path does not exist: ${path.join(".")}`)
+    edits.push({ ...location, replacement: JSON.stringify(replacement) })
+  }
+  edits.sort((left, right) => right.start - left.start)
+  return edits.reduce(
+    (result, edit) =>
+      `${result.slice(0, edit.start)}${edit.replacement}${result.slice(edit.end)}`,
+    source,
+  )
+}
+
 const updateJSONVersion = (path, rootPackage = false) => {
-  const document = JSON.parse(readFileSync(path, "utf8"))
+  const source = readFileSync(path, "utf8")
+  const document = JSON.parse(source)
   let changed = document.version !== version
   if (mode === "verify" && changed) {
     throw new Error(`${path} version is ${document.version}; expected ${version}`)
   }
   document.version = version
+  const replacements = new Map([[['version'], version]])
 
   if (rootPackage && document.packages?.[""]) {
     const rootChanged = document.packages[""].version !== version
@@ -83,10 +196,11 @@ const updateJSONVersion = (path, rootPackage = false) => {
     }
     document.packages[""].version = version
     changed ||= rootChanged
+    replacements.set(["packages", "", "version"], version)
   }
 
   if (mode === "apply" && changed) {
-    writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`)
+    writeFileSync(path, replaceJSONStringValues(source, replacements))
   }
 }
 
