@@ -1,5 +1,5 @@
-name: Publish Adversary
-description: Validate, package, and publish an adversary with a verified Adversary CLI release.
+name: Push Adversary
+description: Validate, package, and push an adversary with a verified Adversary CLI release.
 
 inputs:
   cli-version:
@@ -26,8 +26,8 @@ inputs:
   repository-name:
     description: Optional remote repository name within registry-namespace. The packaged version is used as its tag. Cannot be combined with remote-reference.
     required: false
-  publish-latest:
-    description: Also publish the packaged artifact with the latest tag (true or false).
+  push-latest:
+    description: Also push the packaged artifact with the latest tag (true or false).
     required: false
     default: "false"
   api-url:
@@ -35,7 +35,7 @@ inputs:
     required: false
     default: https://adversarylabs.ai/api
   profile:
-    description: CLI credential profile. Defaults to publish-action for token and OAuth; existing mode uses the CLI default when omitted.
+    description: CLI credential profile. Defaults to push-action for token and OAuth; existing mode uses the CLI default when omitted.
     required: false
   auth-mode:
     description: Authentication mode (token, oauth, or existing). Token is recommended for CI; OAuth uses interactive device login.
@@ -47,7 +47,7 @@ inputs:
   client-name:
     description: Name shown while approving the OAuth device login.
     required: false
-    default: Adversary publish action
+    default: Adversary push action
   registry-host:
     description: Optional OCI registry host override.
     required: false
@@ -57,20 +57,20 @@ inputs:
 
 outputs:
   reference:
-    description: Canonical remote reference published by the registry.
-    value: ${{ steps.publish.outputs.reference }}
+    description: Canonical remote reference pushed to the registry.
+    value: ${{ steps.push.outputs.reference }}
   digest:
-    description: Published OCI image manifest digest.
-    value: ${{ steps.publish.outputs.digest }}
+    description: Pushed OCI image manifest digest.
+    value: ${{ steps.push.outputs.digest }}
   manifest-digest:
-    description: Published adversary manifest referrer digest.
-    value: ${{ steps.publish.outputs.manifest-digest }}
+    description: Pushed adversary manifest referrer digest.
+    value: ${{ steps.push.outputs.manifest-digest }}
   local-reference:
     description: Local canonical reference produced by packaging.
     value: ${{ steps.package.outputs.local-reference }}
   latest-reference:
-    description: Published latest reference when publish-latest is enabled.
-    value: ${{ steps.publish.outputs.latest-reference }}
+    description: Pushed latest reference when push-latest is enabled.
+    value: ${{ steps.push.outputs.latest-reference }}
 
 runs:
   using: composite
@@ -91,14 +91,14 @@ runs:
         INPUT_NAME: ${{ inputs.name }}
       run: bash "$GITHUB_ACTION_PATH/scripts/package.sh"
 
-    - name: Authenticate and publish
-      id: publish
+    - name: Authenticate and push
+      id: push
       shell: bash
       env:
         INPUT_LOCAL_REFERENCE: ${{ steps.package.outputs.local-reference }}
         INPUT_REMOTE_REFERENCE: ${{ inputs.remote-reference }}
         INPUT_REPOSITORY_NAME: ${{ inputs.repository-name }}
-        INPUT_PUBLISH_LATEST: ${{ inputs.publish-latest }}
+        INPUT_PUSH_LATEST: ${{ inputs.push-latest }}
         INPUT_API_URL: ${{ inputs.api-url }}
         INPUT_PROFILE: ${{ inputs.profile }}
         INPUT_AUTH_MODE: ${{ inputs.auth-mode }}
