@@ -48,9 +48,7 @@ if [[ -z "$name" || ${#version_files[@]} -eq 0 ]]; then
   exit 3
 fi
 
-echo "::add-mask::$token"
 auth_header="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
-echo "::add-mask::$auth_header"
 token=''
 credential_key="http.https://github.com/.extraheader"
 cleanup_credentials() {

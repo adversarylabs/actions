@@ -74,6 +74,11 @@ if grep -Fq 'github-do-not-print-me' "$first_log" "$first_output"; then
   echo "version action leaked its GitHub token" >&2
   exit 1
 fi
+encoded_token="$(printf 'x-access-token:%s' 'github-do-not-print-me' | base64 | tr -d '\n')"
+if grep -Fq "$encoded_token" "$first_log" "$first_output"; then
+  echo "version action leaked its Git authentication header" >&2
+  exit 1
+fi
 if git -C "$seed" config --local --get-all http.https://github.com/.extraheader >/dev/null; then
   echo "version action retained Git credentials" >&2
   exit 1
