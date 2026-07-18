@@ -4,8 +4,60 @@ Reusable GitHub Actions for publishing and running Adversary Labs adversaries.
 
 | Action | Status | Purpose |
 | --- | --- | --- |
+| [`version`](version) | Available | Synchronize release metadata from a tag and commit it back to the release branch. |
 | [`publish`](publish) | Available | Validate, build, package, and publish an adversary to an OCI registry. |
 | `run` | Planned | Run one or more adversaries against the checked-out repository. |
+
+## Version an adversary
+
+The version action treats a `v`-prefixed release tag as the source of truth. It updates `adversary.yaml`, synchronizes npm package metadata when present, and commits the result back to the release branch with `[skip-ci]`. Reruns verify and reuse an existing version commit instead of creating another one.
+
+```yaml
+- uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  with:
+    fetch-depth: 0
+    persist-credentials: false
+
+- uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+  with:
+    node-version: 22
+
+- name: Synchronize release metadata
+  id: version
+  uses: adversarylabs/actions/version@v1.0.0
+  with:
+    tag: ${{ github.ref_name }}
+    token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+- name: Publish
+  uses: adversarylabs/actions/publish@v1.0.0
+  with:
+    token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
+    registry-namespace: your-team-slug
+    repository-name: ${{ steps.version.outputs.name }}
+    publish-latest: true
+```
+
+Use a fine-grained GitHub token limited to repository contents read/write. The action stores Git authentication only for its fetch and push operations, removes it before returning, never force-pushes, and never receives the registry credential. `sync-npm: auto` updates `package.json` and `package-lock.json` when `package.json` exists; set it to `false` for non-npm adversaries or `true` to require npm metadata.
+
+### Version inputs
+
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `tag` | yes | — | Release tag formatted as `v<semantic-version>`. |
+| `path` | no | `.` | Adversary project directory. |
+| `branch` | no | `main` | Branch that receives the version commit. |
+| `token` | yes | — | Fine-grained GitHub token with repository contents read/write. |
+| `sync-npm` | no | `auto` | Synchronize npm metadata when present (`auto`, `true`, or `false`). |
+
+### Version outputs
+
+| Output | Description |
+| --- | --- |
+| `name` | OCI-compatible name from `adversary.yaml`. |
+| `version` | Semantic version without the tag's `v` prefix. |
+| `changed` | Whether this invocation created and pushed a version commit. |
+| `commit` | Version bump commit, or current branch commit when unchanged. |
 
 ## Publish an adversary
 
