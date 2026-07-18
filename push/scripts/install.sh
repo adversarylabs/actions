@@ -26,7 +26,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     release = json.load(stream)
 tag = release.get("tag_name")
 if release.get("draft") is not False or release.get("prerelease") is not False:
-    raise SystemExit("GitHub's latest release response was not a stable published release")
+    raise SystemExit("GitHub's latest release response was not a stable release")
 if not isinstance(tag, str) or not tag:
     raise SystemExit("GitHub's latest release response did not include tag_name")
 print(tag)
@@ -46,7 +46,7 @@ fi
 case "$(uname -s)" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) echo "The publish action supports Linux and macOS runners." >&2; exit 2 ;;
+  *) echo "The push action supports Linux and macOS runners." >&2; exit 2 ;;
 esac
 
 case "$(uname -m)" in

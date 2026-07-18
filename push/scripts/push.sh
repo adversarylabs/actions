@@ -5,11 +5,11 @@ local_reference="${INPUT_LOCAL_REFERENCE:?local package reference is required}"
 profile="${INPUT_PROFILE:-}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
 auth_mode="${INPUT_AUTH_MODE:-token}"
-client_name="${INPUT_CLIENT_NAME:-Adversary publish action}"
+client_name="${INPUT_CLIENT_NAME:-Adversary push action}"
 token="${INPUT_TOKEN:-}"
 remote_reference="${INPUT_REMOTE_REFERENCE:-}"
 repository_name="${INPUT_REPOSITORY_NAME:-}"
-publish_latest="${INPUT_PUBLISH_LATEST:-false}"
+push_latest="${INPUT_PUSH_LATEST:-false}"
 unset INPUT_TOKEN
 
 case "$auth_mode" in
@@ -20,9 +20,9 @@ if [[ "$auth_mode" != token && -n "$token" ]]; then
   echo "token can only be used with auth-mode: token" >&2
   exit 2
 fi
-case "$publish_latest" in
+case "$push_latest" in
   true|false) ;;
-  *) echo "publish-latest must be true or false" >&2; exit 2 ;;
+  *) echo "push-latest must be true or false" >&2; exit 2 ;;
 esac
 if [[ -n "$remote_reference" && -n "$repository_name" ]]; then
   echo "remote-reference and repository-name cannot be used together" >&2
@@ -58,7 +58,7 @@ PY
   remote_reference="${registry_host}/${INPUT_REGISTRY_NAMESPACE}/${repository_name}:${local_tag}"
 fi
 if [[ -z "$profile" && "$auth_mode" != existing ]]; then
-  profile=publish-action
+  profile=push-action
 fi
 
 export ADVERSARY_API_URL="$api_url"
@@ -97,8 +97,8 @@ else
   adversary "${push_args[@]}" >"$push_output"
 fi
 
-publication_values="${RUNNER_TEMP}/adversary-publication-values"
-python3 - "$push_output" >"$publication_values" <<'PY'
+push_values="${RUNNER_TEMP}/adversary-push-values"
+python3 - "$push_output" >"$push_values" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     envelope = json.load(stream)
@@ -111,16 +111,16 @@ for key in ("canonicalReference", "digest", "manifestDigest"):
         raise SystemExit(f"adversary push did not return {key}")
     print(value)
 PY
-reference="$(sed -n '1p' "$publication_values")"
-digest="$(sed -n '2p' "$publication_values")"
-manifest_digest="$(sed -n '3p' "$publication_values")"
-if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$publication_values" | tr -d ' ')" != 3 ]]; then
-  echo "adversary push returned incomplete publication metadata" >&2
+reference="$(sed -n '1p' "$push_values")"
+digest="$(sed -n '2p' "$push_values")"
+manifest_digest="$(sed -n '3p' "$push_values")"
+if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$push_values" | tr -d ' ')" != 3 ]]; then
+  echo "adversary push returned incomplete metadata" >&2
   exit 3
 fi
 
 latest_reference=""
-if [[ "$publish_latest" == true ]]; then
+if [[ "$push_latest" == true ]]; then
   latest_reference="$(python3 - "$reference" <<'PY'
 import sys
 
@@ -130,7 +130,7 @@ if "@" in reference:
 else:
     repository, separator, _ = reference.rpartition(":")
     if not separator or "/" not in repository:
-        raise SystemExit("published reference does not contain an explicit registry and tag")
+        raise SystemExit("pushed reference does not contain an explicit registry and tag")
 print(f"{repository}:latest")
 PY
   )"
@@ -153,7 +153,7 @@ if envelope.get("command") != "push" or not isinstance(data, dict):
 if data.get("canonicalReference") != sys.argv[2]:
     raise SystemExit("adversary latest push returned an unexpected canonical reference")
 if data.get("digest") != sys.argv[3] or data.get("manifestDigest") != sys.argv[4]:
-    raise SystemExit("adversary latest push returned different publication digests")
+    raise SystemExit("adversary latest push returned different digests")
 PY
 fi
 
@@ -164,6 +164,6 @@ fi
   printf 'latest-reference=%s\n' "$latest_reference"
 } >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
-printf 'Published %s\n' "$reference"
+printf 'Pushed %s\n' "$reference"
 printf 'Digest: %s\n' "$digest"
-if [[ -n "$latest_reference" ]]; then printf 'Also published %s\n' "$latest_reference"; fi
+if [[ -n "$latest_reference" ]]; then printf 'Also pushed %s\n' "$latest_reference"; fi
