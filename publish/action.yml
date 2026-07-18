@@ -1,10 +1,10 @@
 name: Publish Adversary
-description: Validate, package, and publish an adversary with a pinned Adversary CLI release.
+description: Validate, package, and publish an adversary with a verified Adversary CLI release.
 
 inputs:
   cli-version:
-    description: Exact Adversary CLI release tag to install, for example 2026.7.9-beta.1.
-    required: true
+    description: Exact Adversary CLI release tag to install. When omitted, use GitHub's latest stable release.
+    required: false
   path:
     description: Path to the adversary project, relative to the workspace.
     required: false
@@ -23,6 +23,13 @@ inputs:
   remote-reference:
     description: Optional fully qualified destination. When omitted, the authenticated Adversary Labs namespace is used.
     required: false
+  repository-name:
+    description: Optional remote repository name within registry-namespace. The packaged version is used as its tag. Cannot be combined with remote-reference.
+    required: false
+  publish-latest:
+    description: Also publish the packaged artifact with the latest tag (true or false).
+    required: false
+    default: "false"
   api-url:
     description: Adversary Labs API URL.
     required: false
@@ -61,6 +68,9 @@ outputs:
   local-reference:
     description: Local canonical reference produced by packaging.
     value: ${{ steps.package.outputs.local-reference }}
+  latest-reference:
+    description: Published latest reference when publish-latest is enabled.
+    value: ${{ steps.publish.outputs.latest-reference }}
 
 runs:
   using: composite
@@ -87,6 +97,8 @@ runs:
       env:
         INPUT_LOCAL_REFERENCE: ${{ steps.package.outputs.local-reference }}
         INPUT_REMOTE_REFERENCE: ${{ inputs.remote-reference }}
+        INPUT_REPOSITORY_NAME: ${{ inputs.repository-name }}
+        INPUT_PUBLISH_LATEST: ${{ inputs.publish-latest }}
         INPUT_API_URL: ${{ inputs.api-url }}
         INPUT_PROFILE: ${{ inputs.profile }}
         INPUT_AUTH_MODE: ${{ inputs.auth-mode }}

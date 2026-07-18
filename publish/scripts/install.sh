@@ -1,9 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version="${INPUT_CLI_VERSION:?cli-version is required}"
+download() {
+  local source="$1" output="$2"
+  local args=(--fail --silent --show-error --location --retry 3 --retry-all-errors)
+  if [[ "$source" == https://* ]]; then
+    args+=(--proto '=https' --proto-redir '=https')
+  fi
+  curl "${args[@]}" "$source" --output "$output"
+}
+
+version="${INPUT_CLI_VERSION:-}"
+if [[ -z "$version" ]]; then
+  latest_api="${ADVERSARY_LATEST_RELEASE_API:-https://api.github.com/repos/adversarylabs/adversary/releases/latest}"
+  latest_metadata="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-latest-release.json"
+  if ! download "$latest_api" "$latest_metadata"; then
+    echo "No stable Adversary CLI release could be resolved from GitHub. Set cli-version explicitly to use a prerelease." >&2
+    exit 2
+  fi
+  if ! version="$(python3 - "$latest_metadata" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    release = json.load(stream)
+tag = release.get("tag_name")
+if release.get("draft") is not False or release.get("prerelease") is not False:
+    raise SystemExit("GitHub's latest release response was not a stable published release")
+if not isinstance(tag, str) or not tag:
+    raise SystemExit("GitHub's latest release response did not include tag_name")
+print(tag)
+PY
+  )"; then
+    echo "GitHub did not return a valid stable Adversary CLI release. Set cli-version explicitly to use a prerelease." >&2
+    exit 2
+  fi
+  printf 'Resolved latest stable Adversary CLI release: %s\n' "$version"
+fi
+
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
-  echo "cli-version must be an exact release version, for example 2026.7.9-beta.1." >&2
+  echo "cli-version must be an exact release version, for example 2026.7.17-beta.3." >&2
   exit 2
 fi
 
@@ -26,12 +62,8 @@ download_dir="${RUNNER_TEMP}/adversary-download-${version}"
 rm -rf -- "$install_dir" "$download_dir"
 mkdir -p -- "$install_dir" "$download_dir"
 
-curl_args=(--fail --silent --show-error --location --retry 3 --retry-all-errors)
-if [[ "$base" == https://* ]]; then
-  curl_args+=(--proto '=https' --proto-redir '=https')
-fi
-curl "${curl_args[@]}" "${base}/${archive}" --output "${download_dir}/${archive}"
-curl "${curl_args[@]}" "${base}/checksums.txt" --output "${download_dir}/checksums.txt"
+download "${base}/${archive}" "${download_dir}/${archive}"
+download "${base}/checksums.txt" "${download_dir}/checksums.txt"
 
 expected="$(awk -v artifact="$archive" '
   $2 == artifact || $2 == ("*" artifact) { print tolower($1) }
