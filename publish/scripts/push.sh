@@ -7,6 +7,9 @@ api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
 auth_mode="${INPUT_AUTH_MODE:-token}"
 client_name="${INPUT_CLIENT_NAME:-Adversary publish action}"
 token="${INPUT_TOKEN:-}"
+remote_reference="${INPUT_REMOTE_REFERENCE:-}"
+repository_name="${INPUT_REPOSITORY_NAME:-}"
+publish_latest="${INPUT_PUBLISH_LATEST:-false}"
 unset INPUT_TOKEN
 
 case "$auth_mode" in
@@ -16,6 +19,43 @@ esac
 if [[ "$auth_mode" != token && -n "$token" ]]; then
   echo "token can only be used with auth-mode: token" >&2
   exit 2
+fi
+case "$publish_latest" in
+  true|false) ;;
+  *) echo "publish-latest must be true or false" >&2; exit 2 ;;
+esac
+if [[ -n "$remote_reference" && -n "$repository_name" ]]; then
+  echo "remote-reference and repository-name cannot be used together" >&2
+  exit 2
+fi
+if [[ -n "$repository_name" ]]; then
+  if [[ -z "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then
+    echo "registry-namespace is required with repository-name" >&2
+    exit 2
+  fi
+  if [[ ! "$repository_name" =~ ^[a-z0-9]+([._-][a-z0-9]+)*$ ]]; then
+    echo "repository-name must be a lowercase OCI repository name without a namespace or tag" >&2
+    exit 2
+  fi
+  registry_host="${INPUT_REGISTRY_HOST:-registry.adversarylabs.ai}"
+  if [[ -z "$registry_host" || "$registry_host" == *://* || "$registry_host" == */* ]]; then
+    echo "registry-host must be a registry hostname without a URL scheme or path" >&2
+    exit 2
+  fi
+  local_tag="$(python3 - "$local_reference" <<'PY'
+import re
+import sys
+
+last_component = sys.argv[1].rsplit("/", 1)[-1]
+if ":" not in last_component:
+    raise SystemExit("the packaged canonical reference does not contain a tag")
+tag = last_component.rsplit(":", 1)[1]
+if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", tag):
+    raise SystemExit("the packaged canonical reference contains an invalid tag")
+print(tag)
+PY
+  )"
+  remote_reference="${registry_host}/${INPUT_REGISTRY_NAMESPACE}/${repository_name}:${local_tag}"
 fi
 if [[ -z "$profile" && "$auth_mode" != existing ]]; then
   profile=publish-action
@@ -34,7 +74,7 @@ if [[ "$auth_mode" == token ]]; then
     echo "token must be an Adversary Labs service account token" >&2
     exit 2
   fi
-  if [[ -z "${INPUT_REGISTRY_NAMESPACE:-}" && -z "${INPUT_REMOTE_REFERENCE:-}" ]]; then
+  if [[ -z "${INPUT_REGISTRY_NAMESPACE:-}" && -z "$remote_reference" ]]; then
     echo "registry-namespace or remote-reference is required with auth-mode: token" >&2
     exit 2
   fi
@@ -50,7 +90,7 @@ fi
 
 push_output="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-push.json"
 push_args=(push "$local_reference" --format json)
-if [[ -n "${INPUT_REMOTE_REFERENCE:-}" ]]; then push_args=(push "$local_reference" "$INPUT_REMOTE_REFERENCE" --format json); fi
+if [[ -n "$remote_reference" ]]; then push_args=(push "$local_reference" "$remote_reference" --format json); fi
 if [[ -n "$profile" ]]; then
   adversary --profile "$profile" "${push_args[@]}" >"$push_output"
 else
@@ -79,11 +119,51 @@ if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$pu
   exit 3
 fi
 
+latest_reference=""
+if [[ "$publish_latest" == true ]]; then
+  latest_reference="$(python3 - "$reference" <<'PY'
+import sys
+
+reference = sys.argv[1]
+if "@" in reference:
+    repository = reference.split("@", 1)[0]
+else:
+    repository, separator, _ = reference.rpartition(":")
+    if not separator or "/" not in repository:
+        raise SystemExit("published reference does not contain an explicit registry and tag")
+print(f"{repository}:latest")
+PY
+  )"
+  latest_output="${RUNNER_TEMP}/adversary-push-latest.json"
+  latest_args=(push "$local_reference" "$latest_reference" --format json)
+  if [[ -n "$profile" ]]; then
+    adversary --profile "$profile" "${latest_args[@]}" >"$latest_output"
+  else
+    adversary "${latest_args[@]}" >"$latest_output"
+  fi
+  python3 - "$latest_output" "$latest_reference" "$digest" "$manifest_digest" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    envelope = json.load(stream)
+data = envelope.get("data")
+if envelope.get("command") != "push" or not isinstance(data, dict):
+    raise SystemExit("adversary latest push returned an unexpected JSON envelope")
+if data.get("canonicalReference") != sys.argv[2]:
+    raise SystemExit("adversary latest push returned an unexpected canonical reference")
+if data.get("digest") != sys.argv[3] or data.get("manifestDigest") != sys.argv[4]:
+    raise SystemExit("adversary latest push returned different publication digests")
+PY
+fi
+
 {
   printf 'reference=%s\n' "$reference"
   printf 'digest=%s\n' "$digest"
   printf 'manifest-digest=%s\n' "$manifest_digest"
+  printf 'latest-reference=%s\n' "$latest_reference"
 } >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
 printf 'Published %s\n' "$reference"
 printf 'Digest: %s\n' "$digest"
+if [[ -n "$latest_reference" ]]; then printf 'Also published %s\n' "$latest_reference"; fi

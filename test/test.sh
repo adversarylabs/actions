@@ -10,7 +10,15 @@ bash -n "$root/publish/scripts/package.sh"
 bash -n "$root/publish/scripts/push.sh"
 grep -Fq 'using: composite' "$root/publish/action.yml"
 grep -Fq 'cli-version:' "$root/publish/action.yml"
+cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/publish/action.yml")"
+grep -Fq 'required: false' <<<"$cli_version_input"
+if grep -Fq 'required: true' <<<"$cli_version_input"; then
+  echo "cli-version is still required" >&2
+  exit 1
+fi
 grep -Fq 'install-dependencies:' "$root/publish/action.yml"
+grep -Fq 'repository-name:' "$root/publish/action.yml"
+grep -Fq 'publish-latest:' "$root/publish/action.yml"
 grep -Fq 'auth-mode:' "$root/publish/action.yml"
 grep -Fq 'token:' "$root/publish/action.yml"
 if grep -Eq 'email-address:|INPUT_EMAIL_ADDRESS|password:|INPUT_PASSWORD' "$root/publish/action.yml"; then
@@ -53,6 +61,26 @@ printf 'SHA256 (%s) = %s\n' "$archive" "$checksum" >"$release/checksums.txt"
 INPUT_CLI_VERSION="$version" RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/publish/scripts/install.sh" >/dev/null
 
+latest_metadata="$tmp/latest-release.json"
+printf '{"tag_name":"%s","draft":false,"prerelease":false}\n' "$version" >"$latest_metadata"
+latest_output="$tmp/latest-output"
+INPUT_CLI_VERSION='' RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
+  ADVERSARY_LATEST_RELEASE_API="file://$latest_metadata" ADVERSARY_DOWNLOAD_BASE="file://$release" \
+  bash "$root/publish/scripts/install.sh" >"$latest_output"
+grep -Fq "Resolved latest stable Adversary CLI release: $version" "$latest_output"
+installed="$(tail -n 1 "$github_path")/adversary"
+[[ -x "$installed" ]]
+
+prerelease_metadata="$tmp/prerelease.json"
+printf '{"tag_name":"%s","draft":false,"prerelease":true}\n' "$version" >"$prerelease_metadata"
+if INPUT_CLI_VERSION='' RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
+  ADVERSARY_LATEST_RELEASE_API="file://$prerelease_metadata" ADVERSARY_DOWNLOAD_BASE="file://$release" \
+  bash "$root/publish/scripts/install.sh" >"$tmp/prerelease-stdout" 2>"$tmp/prerelease-stderr"; then
+  echo "installer selected a prerelease as the latest stable CLI" >&2
+  exit 1
+fi
+grep -Fq 'Set cli-version explicitly to use a prerelease.' "$tmp/prerelease-stderr"
+
 if INPUT_CLI_VERSION=latest RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/publish/scripts/install.sh" >/dev/null 2>&1; then
   echo "installer accepted a mutable CLI version" >&2
@@ -92,7 +120,10 @@ case "$command" in
   logout) [[ "$1" == --local-only ]] ;;
   validate) [[ "$1" == project || "$1" == project-pnpm ]] ;;
   pack) printf '%s\n' '{"schemaVersion":2,"command":"pack","data":{"canonicalReference":"example:1.0.0"}}' ;;
-  push) printf '%s\n' '{"schemaVersion":1,"command":"push","data":{"canonicalReference":"registry.example/team/example:1.0.0","digest":"sha256:image","manifestDigest":"sha256:manifest"}}' ;;
+  push)
+    reference="$2"
+    printf '{"schemaVersion":1,"command":"push","data":{"canonicalReference":"%s","digest":"sha256:image","manifestDigest":"sha256:manifest"}}\n' "$reference"
+    ;;
   *) echo "unexpected command: $command" >&2; exit 9 ;;
 esac
 FAKE
@@ -148,6 +179,38 @@ grep -Fq 'digest=sha256:image' "$push_output"
 grep -Fq 'manifest-digest=sha256:manifest' "$push_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/publish-stdout" "$package_output" "$push_output"; then
   echo "service account token leaked into action output" >&2
+  exit 1
+fi
+
+named_log="$tmp/named.log"
+named_output="$tmp/named-output"
+PATH="$fake_bin:$PATH" FAKE_LOG="$named_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
+  INPUT_LOCAL_REFERENCE=registry.adversarylabs.ai/library/depotci:0.0.3 INPUT_PROFILE=release \
+  INPUT_API_URL=https://api.example INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' \
+  INPUT_CLIENT_NAME='GitHub Actions' INPUT_REMOTE_REFERENCE='' INPUT_REPOSITORY_NAME=depotci-adversary \
+  INPUT_PUBLISH_LATEST=true INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash "$root/publish/scripts/push.sh" >/dev/null
+grep -Fq 'push profile=release args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3 --format json' "$named_log"
+grep -Fq 'push profile=release args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest --format json' "$named_log"
+grep -Fq 'reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3' "$named_output"
+grep -Fq 'latest-reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest' "$named_output"
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=existing INPUT_TOKEN='' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 INPUT_REPOSITORY_NAME=example \
+  INPUT_PUBLISH_LATEST=false INPUT_REGISTRY_NAMESPACE=team \
+  bash "$root/publish/scripts/push.sh" >/dev/null 2>&1; then
+  echo "publish accepted both remote-reference and repository-name" >&2
+  exit 1
+fi
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=existing INPUT_TOKEN='' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 INPUT_REPOSITORY_NAME='' \
+  INPUT_PUBLISH_LATEST=maybe INPUT_REGISTRY_NAMESPACE=team \
+  bash "$root/publish/scripts/push.sh" >/dev/null 2>&1; then
+  echo "publish accepted an invalid publish-latest value" >&2
   exit 1
 fi
 
