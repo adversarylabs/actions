@@ -130,8 +130,13 @@ if [[ -n "$openai_base_url" ]]; then export ADVERSARY_OPENAI_BASE_URL="$openai_b
 if [[ -n "$anthropic_base_url" ]]; then export ADVERSARY_ANTHROPIC_BASE_URL="$anthropic_base_url"; fi
 if [[ -n "$fireworks_base_url" ]]; then export ADVERSARY_FIREWORKS_BASE_URL="$fireworks_base_url"; fi
 
-if [[ -z "$profile" && ( "$auth_mode" == token || "$auth_mode" == oauth ) ]]; then
-  profile=run-action
+# Token/OAuth always use an ephemeral action-owned profile so cleanup cannot
+# remove a caller-owned profile that happens to share a name.
+owns_temp_profile=false
+if [[ "$auth_mode" == token || "$auth_mode" == oauth ]]; then
+  profile_prefix="${profile:-run-action}"
+  profile="${profile_prefix}-${BASHPID:-$$}-${RANDOM}"
+  owns_temp_profile=true
 fi
 
 export ADVERSARY_API_URL="$api_url"
@@ -139,7 +144,7 @@ if [[ -n "${INPUT_REGISTRY_HOST:-}" ]]; then export ADVERSARY_REGISTRY_HOST="$IN
 if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then export ADVERSARY_REGISTRY_NAMESPACE="$INPUT_REGISTRY_NAMESPACE"; fi
 
 cleanup_auth() {
-  if [[ -n "${profile:-}" && ( "$auth_mode" == token || "$auth_mode" == oauth ) ]]; then
+  if [[ "${owns_temp_profile:-false}" == true && -n "${profile:-}" ]]; then
     adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true
   fi
 }
@@ -189,7 +194,9 @@ result_file=""
 findings_count=""
 run_stdout=""
 if [[ "$format" == json ]]; then
-  result_file="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-run.json"
+  # Unique per invocation so concurrent or sequential run steps in one job
+  # do not overwrite each other's result-file outputs.
+  result_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-run.XXXXXX")"
   run_stdout="$result_file"
 fi
 

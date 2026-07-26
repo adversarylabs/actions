@@ -203,7 +203,7 @@ For pull-request change detection, pass `base` and `head` git SHAs or refs. Use 
 
 ### Authentication
 
-Default `auth-mode: none` skips login so public and local adversaries work without a token. For private registry pulls in CI, set `auth-mode: token` and pass a service-account token with pull access (not a push credential) from Depot CI or GitHub Actions secrets. The action sends the token to `adversary login --token-stdin`, clears it from the environment, and removes the temporary `run-action` profile afterward.
+Default `auth-mode: none` skips login so public and local adversaries work without a token. For private registry pulls in CI, set `auth-mode: token` and pass a service-account token with pull access (not a push credential) from Depot CI or GitHub Actions secrets. The action sends the token to `adversary login --token-stdin`, clears it from the environment, and removes a unique temporary profile afterward so caller-owned profiles are never logged out.
 
 ```yaml
 - uses: adversarylabs/actions/run@v1.0.0
@@ -254,7 +254,7 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 | `fireworks-base-url` | no | — | Fireworks-compatible base URL override. |
 | `fail-on-findings` | no | `true` | Fail the step when the review reports findings. |
 | `api-url` | no | hosted API | API endpoint used for login. |
-| `profile` | no | `run-action` for token/OAuth; CLI default otherwise | CLI credential profile. |
+| `profile` | no | ephemeral `run-action-<id>` for token/OAuth; CLI default otherwise | For `existing`, the CLI profile to use (never logged out). For token/OAuth, used only as a name prefix for a unique action-owned profile that is removed after the step. |
 | `auth-mode` | no | `none` | `none`, `token`, `oauth`, or `existing`. |
 | `token` | with token auth | — | Pull-scoped service-account token secret. |
 | `client-name` | no | `Adversary run action` | Name shown on the OAuth device-approval screen. |

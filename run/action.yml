@@ -95,7 +95,7 @@ inputs:
     required: false
     default: https://adversarylabs.ai/api
   profile:
-    description: CLI credential profile. Defaults to run-action for token and OAuth; existing/none modes use the CLI default when omitted.
+    description: CLI credential profile for auth-mode existing (and as a prefix for ephemeral token/OAuth profiles). Token and OAuth always use a unique action-owned profile that is removed after the step; existing/none never log out.
     required: false
   auth-mode:
     description: Authentication mode (none, token, oauth, or existing). Token is recommended for private registry pulls in CI; none skips login for public or local adversaries.

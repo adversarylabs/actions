@@ -129,9 +129,14 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >"$tmp/run-stdout"
 
-grep -Fq 'login profile=run-action args=--token-stdin --registry-namespace adversarylabs' "$log"
-grep -Fq 'run profile=run-action args=adversarylabs/dockerfile --path src --builder local --format text' "$log"
-grep -Fq 'logout profile=run-action args=--local-only' "$log"
+grep -Eq 'login profile=run-action-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$log"
+grep -Eq 'run profile=run-action-[0-9]+-[0-9]+ args=adversarylabs/dockerfile --path src --builder local --format text' "$log"
+grep -Eq 'logout profile=run-action-[0-9]+-[0-9]+ args=--local-only' "$log"
+# Ephemeral profiles must not log out a bare caller-owned name.
+if grep -Eq 'logout profile=run-action args=' "$log"; then
+  echo "run action logged out a non-ephemeral profile name" >&2
+  exit 1
+fi
 grep -Fq 'exit-code=0' "$run_output"
 grep -Fq 'outcome=success' "$run_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/run-stdout" "$run_output"; then
@@ -160,6 +165,8 @@ grep -Fq 'env OPENAI_API_KEY=sk-do-not-print' "$model_log"
 grep -Fq 'findings-count=0' "$model_output"
 grep -Fq 'outcome=success' "$model_output"
 grep -Fq 'result-file=' "$model_output"
+model_result_file="$(sed -n 's/^result-file=//p' "$model_output" | head -n 1)"
+[[ -n "$model_result_file" && -f "$model_result_file" ]]
 if grep -Fq 'sk-do-not-print' "$model_output" "$tmp/model-stdout"; then
   echo "model API key leaked into action outputs" >&2
   exit 1
@@ -168,6 +175,29 @@ if grep -Eq '^(login|logout) ' "$model_log"; then
   echo "none authentication unexpectedly changed CLI login state" >&2
   exit 1
 fi
+
+# Sequential JSON runs in one job must not share a result path.
+second_output="$tmp/second-output"
+: >"$model_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$model_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$second_output" \
+  INPUT_ADVERSARIES='adversarylabs/go-cli' INPUT_PATH=. INPUT_BASE='' INPUT_HEAD='' \
+  INPUT_ALL_FILES=false INPUT_BUILDER=local INPUT_BUILD=false INPUT_FORCE=false \
+  INPUT_FORMAT=json INPUT_KEEP_TEMP=false INPUT_NO_NETWORK=false INPUT_VERBOSE=false \
+  INPUT_INCLUDE_SUPPRESSED=false INPUT_SHELL=false INPUT_ALLOW_UNSAFE_HOST_EXECUTION=false \
+  INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
+  INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
+  INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+second_result_file="$(sed -n 's/^result-file=//p' "$second_output" | head -n 1)"
+[[ -n "$second_result_file" && -f "$second_result_file" ]]
+if [[ "$model_result_file" == "$second_result_file" ]]; then
+  echo "sequential JSON runs reused the same result-file path" >&2
+  exit 1
+fi
+# First run's capture must remain intact after the second run.
+grep -Fq '"protocolVersion":1' "$model_result_file"
 
 multi_log="$tmp/multi.log"
 multi_output="$tmp/multi-output"
@@ -186,6 +216,33 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$multi_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT
 
 grep -Fq 'run profile=preconfigured args=adversarylabs/a adversarylabs/b --path . --builder docker --format json --base main --head HEAD --build --force --keep-temp --allow-unsafe-host-execution' "$multi_log"
 grep -Fq 'findings-count=1' "$multi_output"
+if grep -Eq '^(login|logout) ' "$multi_log"; then
+  echo "existing authentication unexpectedly changed CLI login state" >&2
+  exit 1
+fi
+
+# Explicit profile with token auth must not log out the bare caller profile name.
+explicit_log="$tmp/explicit-token.log"
+explicit_output="$tmp/explicit-token-output"
+: >"$explicit_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$explicit_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$explicit_output" \
+  INPUT_ADVERSARIES='adversarylabs/dockerfile' INPUT_PATH=. INPUT_BASE='' INPUT_HEAD='' \
+  INPUT_ALL_FILES=false INPUT_BUILDER=local INPUT_BUILD=false INPUT_FORCE=false \
+  INPUT_FORMAT=text INPUT_KEEP_TEMP=false INPUT_NO_NETWORK=false INPUT_VERBOSE=false \
+  INPUT_INCLUDE_SUPPRESSED=false INPUT_SHELL=false INPUT_ALLOW_UNSAFE_HOST_EXECUTION=false \
+  INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
+  INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
+  INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE=preconfigured \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+grep -Eq 'login profile=preconfigured-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$explicit_log"
+grep -Eq 'logout profile=preconfigured-[0-9]+-[0-9]+ args=--local-only' "$explicit_log"
+if grep -Eq 'logout profile=preconfigured args=' "$explicit_log"; then
+  echo "token auth logged out the caller-owned profile name" >&2
+  exit 1
+fi
 
 findings_log="$tmp/findings.log"
 findings_output="$tmp/findings-output"
