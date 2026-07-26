@@ -1,0 +1,180 @@
+name: Run Adversary
+description: Install the Adversary CLI and run one or more adversaries against a local repository.
+
+inputs:
+  adversaries:
+    description: One or more adversary references separated by whitespace or newlines (for example adversarylabs/dockerfile or a local path).
+    required: true
+  cli-version:
+    description: Exact Adversary CLI release tag to install. When omitted, use GitHub's latest stable release.
+    required: false
+  path:
+    description: Path to the source directory to review, relative to the workspace.
+    required: false
+    default: .
+  base:
+    description: Git base ref for change detection (defaults to the detected default branch when head is set).
+    required: false
+  head:
+    description: Git head ref for change detection (defaults to HEAD when base is set).
+    required: false
+  all-files:
+    description: Scan the entire target instead of inferring a change (true or false).
+    required: false
+    default: "false"
+  builder:
+    description: Build mechanism for local adversaries (local or docker).
+    required: false
+    default: local
+  build:
+    description: Build a local adversary before running (true or false). May update dist.
+    required: false
+    default: "false"
+  force:
+    description: Run even when triggers.files_changed does not match (true or false).
+    required: false
+    default: "false"
+  format:
+    description: Output format (text or json).
+    required: false
+    default: text
+  keep-temp:
+    description: Do not delete the temporary run directory (true or false).
+    required: false
+    default: "false"
+  no-network:
+    description: Require network access to be disabled for the adversary child (true or false).
+    required: false
+    default: "false"
+  verbose:
+    description: Print detailed execution diagnostics (true or false).
+    required: false
+    default: "false"
+  include-suppressed:
+    description: Request suppressed review findings when supported (true or false).
+    required: false
+    default: "false"
+  shell:
+    description: UNSAFE. Launch an unrestricted host shell in the adversary working directory (true or false).
+    required: false
+    default: "false"
+  allow-unsafe-host-execution:
+    description: Explicitly allow unrestricted HostExecutor use for an unknown publisher (true or false).
+    required: false
+    default: "false"
+  timeout:
+    description: Maximum adversary execution time as a Go duration (for example 10m). Empty or 0 disables the deadline.
+    required: false
+  build-timeout:
+    description: Maximum explicit local build time as a Go duration (for example 10m).
+    required: false
+  model-provider:
+    description: Model provider for model-backed adversaries (openai, anthropic, or fireworks). Overrides ADVERSARY_MODEL_PROVIDER.
+    required: false
+  model:
+    description: Provider model identifier for model-backed adversaries. Overrides ADVERSARY_MODEL.
+    required: false
+  model-api-key:
+    description: Provider API key for model-backed adversaries. Mapped to OPENAI_API_KEY, ANTHROPIC_API_KEY, or FIREWORKS_API_KEY based on model-provider. Prefer a Depot CI or GitHub Actions secret.
+    required: false
+  openai-base-url:
+    description: Optional OpenAI-compatible base URL override (ADVERSARY_OPENAI_BASE_URL).
+    required: false
+  anthropic-base-url:
+    description: Optional Anthropic-compatible base URL override (ADVERSARY_ANTHROPIC_BASE_URL).
+    required: false
+  fireworks-base-url:
+    description: Optional Fireworks-compatible base URL override (ADVERSARY_FIREWORKS_BASE_URL).
+    required: false
+  fail-on-findings:
+    description: Fail the step when the review reports findings (true or false). When false, findings still set outputs but exit 0.
+    required: false
+    default: "true"
+  api-url:
+    description: Adversary Labs API URL.
+    required: false
+    default: https://adversarylabs.ai/api
+  profile:
+    description: CLI credential profile for auth-mode existing (and as a prefix for ephemeral token/OAuth profiles). Token and OAuth always use a unique action-owned profile that is removed after the step; existing/none never log out.
+    required: false
+  auth-mode:
+    description: Authentication mode (none, token, oauth, or existing). Token is recommended for private registry pulls in CI; none skips login for public or local adversaries.
+    required: false
+    default: none
+  token:
+    description: Service account token used by token authentication. Pass a Depot CI or GitHub Actions secret. Prefer a pull-scoped token, not a push credential.
+    required: false
+  client-name:
+    description: Name shown while approving the OAuth device login.
+    required: false
+    default: Adversary run action
+  registry-host:
+    description: Optional OCI registry host override.
+    required: false
+  registry-namespace:
+    description: Optional default OCI namespace for service-account login and pulls.
+    required: false
+
+outputs:
+  exit-code:
+    description: Exit code from adversary run (0 success, 1 findings, 2 usage, 3 execution failure, 4 network/auth).
+    value: ${{ steps.run.outputs.exit-code }}
+  findings-count:
+    description: Number of findings when format is json; empty for text output.
+    value: ${{ steps.run.outputs.findings-count }}
+  result-file:
+    description: Path to captured stdout when format is json; empty for text output.
+    value: ${{ steps.run.outputs.result-file }}
+  outcome:
+    description: success, findings, or failure.
+    value: ${{ steps.run.outputs.outcome }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Adversary CLI
+      shell: bash
+      env:
+        INPUT_CLI_VERSION: ${{ inputs.cli-version }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+
+    - name: Authenticate and run
+      id: run
+      shell: bash
+      env:
+        INPUT_ADVERSARIES: ${{ inputs.adversaries }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_HEAD: ${{ inputs.head }}
+        INPUT_ALL_FILES: ${{ inputs.all-files }}
+        INPUT_BUILDER: ${{ inputs.builder }}
+        INPUT_BUILD: ${{ inputs.build }}
+        INPUT_FORCE: ${{ inputs.force }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_KEEP_TEMP: ${{ inputs.keep-temp }}
+        INPUT_NO_NETWORK: ${{ inputs.no-network }}
+        INPUT_VERBOSE: ${{ inputs.verbose }}
+        INPUT_INCLUDE_SUPPRESSED: ${{ inputs.include-suppressed }}
+        INPUT_SHELL: ${{ inputs.shell }}
+        INPUT_ALLOW_UNSAFE_HOST_EXECUTION: ${{ inputs.allow-unsafe-host-execution }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_BUILD_TIMEOUT: ${{ inputs.build-timeout }}
+        INPUT_MODEL_PROVIDER: ${{ inputs.model-provider }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_MODEL_API_KEY: ${{ inputs.model-api-key }}
+        INPUT_OPENAI_BASE_URL: ${{ inputs.openai-base-url }}
+        INPUT_ANTHROPIC_BASE_URL: ${{ inputs.anthropic-base-url }}
+        INPUT_FIREWORKS_BASE_URL: ${{ inputs.fireworks-base-url }}
+        INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        INPUT_API_URL: ${{ inputs.api-url }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_AUTH_MODE: ${{ inputs.auth-mode }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_CLIENT_NAME: ${{ inputs.client-name }}
+        INPUT_REGISTRY_HOST: ${{ inputs.registry-host }}
+        INPUT_REGISTRY_NAMESPACE: ${{ inputs.registry-namespace }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"
+
+branding:
+  icon: search
+  color: purple
