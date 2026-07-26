@@ -6,7 +6,7 @@ Reusable GitHub Actions for pushing and running Adversary Labs adversaries.
 | --- | --- | --- |
 | [`version`](version) | Available | Synchronize release metadata from a tag and commit it back to the release branch. |
 | [`push`](push) | Available | Validate, build, package, and push an adversary to an OCI registry. |
-| `run` | Planned | Run one or more adversaries against the checked-out repository. |
+| [`run`](run) | Available | Run one or more adversaries against the checked-out repository. |
 
 ## Version an adversary
 
@@ -151,14 +151,133 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 | `local-reference` | Canonical reference produced by the package step. |
 | `latest-reference` | Pushed `latest` reference when `push-latest` is enabled. |
 
+## Run adversaries
+
+The run action installs an Adversary CLI release, optionally authenticates for private registry pulls, and executes `adversary run` against the checked-out source. It maps every active `adversary run` flag and supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
+
+```yaml
+name: Adversary review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: depot-ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Run adversaries
+        id: review
+        uses: adversarylabs/actions/run@v1.0.0
+        with:
+          adversaries: |
+            adversarylabs/dockerfile
+            adversarylabs/go-cli
+          path: .
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          auth-mode: token
+          token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
+          registry-namespace: your-team-slug
+          model-provider: openai
+          model: gpt-4o
+          model-api-key: ${{ secrets.OPENAI_API_KEY }}
+          format: json
+
+      - name: Report outcome
+        if: always()
+        run: |
+          echo "outcome=${{ steps.review.outputs.outcome }}"
+          echo "findings=${{ steps.review.outputs.findings-count }}"
+```
+
+When `cli-version` is omitted, the action installs the latest stable Adversary CLI release (same resolution rules as push). Pin `cli-version` and the action ref for reproducible CI. `path` defaults to `.`.
+
+For pull-request change detection, pass `base` and `head` git SHAs or refs. Use `all-files: true` for a full-tree scan (for example on `push` to main). `base`/`head` and `all-files` cannot be combined.
+
+### Authentication
+
+Default `auth-mode: none` skips login so public and local adversaries work without a token. For private registry pulls in CI, set `auth-mode: token` and pass a service-account token with pull access (not a push credential) from Depot CI or GitHub Actions secrets. The action sends the token to `adversary login --token-stdin`, clears it from the environment, and removes the temporary `run-action` profile afterward.
+
+```yaml
+- uses: adversarylabs/actions/run@v1.0.0
+  with:
+    adversaries: your-team/private-reviewer
+    auth-mode: token
+    token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
+    registry-namespace: your-team-slug
+```
+
+`auth-mode: oauth` uses interactive device login. `auth-mode: existing` uses a preconfigured CLI profile or Docker credential store and never logs in or out.
+
+### Model-backed adversaries
+
+Provide `model-provider` (`openai`, `anthropic`, or `fireworks`), `model`, and `model-api-key` (a secret). The action maps the key to `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `FIREWORKS_API_KEY` and never places API keys on the CLI argument list. Optional `openai-base-url`, `anthropic-base-url`, and `fireworks-base-url` set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
+
+### Exit codes and findings
+
+The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configuration, `3` execution failure, `4` network/auth. Set `fail-on-findings: false` to keep findings in outputs while exiting `0` (useful when a later step posts a report). With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
+
+### Run inputs
+
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `adversaries` | yes | — | One or more adversary refs (whitespace or newlines). |
+| `cli-version` | no | latest stable release | Exact Adversary CLI release tag. |
+| `path` | no | `.` | Source directory to review. |
+| `base` | no | — | Git base ref for change detection. |
+| `head` | no | — | Git head ref for change detection. |
+| `all-files` | no | `false` | Scan the entire target instead of a change. |
+| `builder` | no | `local` | `local` or `docker` builder for local adversaries. |
+| `build` | no | `false` | Build a local adversary before running. |
+| `force` | no | `false` | Run even when file triggers do not match. |
+| `format` | no | `text` | `text` or `json` output. |
+| `keep-temp` | no | `false` | Keep the temporary run directory. |
+| `no-network` | no | `false` | Require network isolation for the adversary child. |
+| `verbose` | no | `false` | Detailed execution diagnostics. |
+| `include-suppressed` | no | `false` | Request suppressed findings when supported. |
+| `shell` | no | `false` | UNSAFE host shell in the adversary working directory. |
+| `allow-unsafe-host-execution` | no | `false` | Allow unrestricted HostExecutor for an unknown publisher. |
+| `timeout` | no | — | Max execution time (Go duration, for example `10m`). |
+| `build-timeout` | no | — | Max explicit local build time (Go duration). |
+| `model-provider` | no | — | `openai`, `anthropic`, or `fireworks`. |
+| `model` | no | — | Provider model identifier. |
+| `model-api-key` | no | — | Provider API key secret mapped from `model-provider`. |
+| `openai-base-url` | no | — | OpenAI-compatible base URL override. |
+| `anthropic-base-url` | no | — | Anthropic-compatible base URL override. |
+| `fireworks-base-url` | no | — | Fireworks-compatible base URL override. |
+| `fail-on-findings` | no | `true` | Fail the step when the review reports findings. |
+| `api-url` | no | hosted API | API endpoint used for login. |
+| `profile` | no | `run-action` for token/OAuth; CLI default otherwise | CLI credential profile. |
+| `auth-mode` | no | `none` | `none`, `token`, `oauth`, or `existing`. |
+| `token` | with token auth | — | Pull-scoped service-account token secret. |
+| `client-name` | no | `Adversary run action` | Name shown on the OAuth device-approval screen. |
+| `registry-host` | no | — | Registry host override. |
+| `registry-namespace` | no | — | Team registry namespace for service-account login. |
+
+### Run outputs
+
+| Output | Description |
+| --- | --- |
+| `exit-code` | CLI exit code (`0`–`4`). |
+| `findings-count` | Finding count when `format` is `json`; empty for text. |
+| `result-file` | Path to captured JSON stdout when `format` is `json`. |
+| `outcome` | `success`, `findings`, or `failure`. |
+
 ## Security model
 
-- Target source is built because pushing necessarily packages the adversary. Use this action only on reviewed code and protected release refs.
+- **Push**: target source is built because packaging is required. Use only on reviewed code and protected release refs. Validation and packaging finish before authentication so target build scripts never see the service-account token. Prefer a push-scoped token.
+- **Run**: read-only review of the checked-out tree. Prefer a pull-scoped service-account token (or `auth-mode: none` for public/local adversaries). Do not reuse push credentials in ordinary review jobs.
 - The CLI archive is checksum-verified before execution. Pin `cli-version` in the caller workflow when exact toolchain reproducibility is required.
-- Validation, dependency installation, and packaging finish before authentication, so target build and lifecycle scripts never run with the service-account token.
-- The service-account token is passed through standard input, removed from the environment before `push`, and its temporary CLI profile is removed afterward.
-- The action requires no write permission for the caller repository. Registry authority comes only from the supplied credential flow.
-- Pushing is intentionally separate from the future read-only `run` action so release credentials never enter ordinary review jobs.
+- Service-account tokens are passed through standard input, removed from the environment before `run`/`push`, and temporary CLI profiles are removed afterward.
+- Model API keys are passed only through environment variables (never CLI flags) and are unset from action input env before the CLI is invoked.
+- Neither action requires write permission for the caller repository. Registry authority comes only from the supplied credential flow.
 
 ## Development
 

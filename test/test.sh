@@ -272,3 +272,4 @@ fi
 
 echo "push action tests passed"
 bash "$root/test/version.sh"
+bash "$root/test/run.sh"
