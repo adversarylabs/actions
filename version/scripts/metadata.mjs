@@ -36,7 +36,12 @@ const scalar = (line, key) => {
 }
 
 const name = scalar(names[0], "name")
-if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(name)) {
+// Single-segment (legacy) or domain/name catalog ids (e.g. go/security).
+if (
+  !/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/.test(
+    name,
+  )
+) {
   throw new Error(`adversary name is not an OCI-compatible repository name: ${name}`)
 }
 
