@@ -4,13 +4,13 @@ Reusable GitHub Actions for pushing and running Adversary Labs adversaries.
 
 | Action | Status | Purpose |
 | --- | --- | --- |
-| [`version`](version) | Available | Synchronize release metadata from a tag and commit it back to the release branch. |
+| [`version`](version) | Available | Synchronize release metadata and runtime identity, rebuild, verify, and commit from a release version. |
 | [`push`](push) | Available | Validate, build, package, and push an adversary to an OCI registry. |
 | [`run`](run) | Available | Run one or more adversaries against the checked-out repository. |
 
 ## Version an adversary
 
-The version action treats a `v`-prefixed release tag as the source of truth. It updates `adversary.yaml`, synchronizes npm package metadata when present, and commits the result back to the release branch with `[skip-ci]`. Reruns verify and reuse an existing version commit instead of creating another one.
+The version action treats a `v`-prefixed release version as the source of truth. It updates `adversary.yaml`, synchronizes npm package metadata when present, safely updates a single literal `version` property in the `new Adversary({...})` initializer, rebuilds Node projects, and imports the built runtime to require `createApp().version` to equal the release version. Changed, already tracked `dist/` artifacts are included in the metadata commit. Reruns verify and reuse an existing version commit instead of creating another one.
 
 ```yaml
 - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -40,11 +40,21 @@ The version action treats a `v`-prefixed release tag as the source of truth. It 
 
 Use a fine-grained GitHub token limited to repository contents read/write. The action stores Git authentication only for its fetch and push operations, removes it before returning, never force-pushes, and never receives the registry credential. `sync-npm: auto` updates `package.json` and `package-lock.json` when `package.json` exists; set it to `false` for non-npm adversaries or `true` to require npm metadata.
 
+For Node adversaries, the runtime command must identify a project-relative JavaScript entrypoint and the built module must export `createApp()`. A literal runtime version is synchronized with a token-aware source edit; computed or omitted versions are left untouched and accepted only when the rebuilt app reports the correct version (for example, when a future SDK infers it from package metadata). Multiple initializers and runtimes that cannot prove their identity fail closed. Non-Node adversaries keep the metadata-only behavior. Dependency installation and builds use the repository's npm, pnpm, or Yarn lockfile; an existing build script is run when present.
+
+### Prepare before tagging
+
+Existing tag-triggered workflows remain supported, but they necessarily build from a working tree that differs from the tag when a version update is needed. For signed tag/runtime identity, run this action on the release branch *before* creating the tag: pass the intended `v<version>` as `tag`, wait for the action to push its commit, then create the annotated or signed tag at `${{ steps.version.outputs.commit }}`. The existing release workflow should become verify-and-publish-only for that tag. This ordering makes the tagged tree, rebuilt runtime, registry bytes, and protocol version identical.
+
+The preparation workflow should check out the release branch itself (not a tag) with full history, invoke `version` with the intended tag text, and hand its `commit` output to authorized signing/release tooling. That tooling must fetch the pushed commit and create the tag at that exact object; it should reject an existing tag or a branch that advanced unexpectedly. The tag-triggered workflow then validates and publishes without mutating source.
+
+During migration, do not create the tag until the version step succeeds. The backward-compatible tag-triggered mode still fixes and verifies the published runtime and main-branch metadata, but it cannot retroactively change the already-created tag object.
+
 ### Version inputs
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `tag` | yes | — | Release tag formatted as `v<semantic-version>`. |
+| `tag` | yes | — | Intended release tag formatted as `v<semantic-version>`; it may be prepared before the tag exists. |
 | `path` | no | `.` | Adversary project directory. |
 | `branch` | no | `main` | Branch that receives the version commit. |
 | `token` | yes | — | Fine-grained GitHub token with repository contents read/write. |
