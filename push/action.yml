@@ -38,9 +38,9 @@ inputs:
     description: CLI credential profile. Defaults to push-action for OIDC, token, and OAuth; existing mode uses the CLI default when omitted.
     required: false
   auth-mode:
-    description: Authentication mode (oidc, token, oauth, or existing). OIDC uses a short-lived GitHub Actions or Depot CI identity.
+    description: Authentication mode (auto, oidc, token, oauth, or existing). Auto uses token when supplied and otherwise requests OIDC.
     required: false
-    default: oidc
+    default: auto
   token:
     description: Service account token used by token authentication. For v1 compatibility, supplying it without auth-mode selects token auth.
     required: false

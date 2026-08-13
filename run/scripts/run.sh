@@ -144,10 +144,12 @@ if [[ -n "${INPUT_REGISTRY_HOST:-}" ]]; then export ADVERSARY_REGISTRY_HOST="$IN
 if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then export ADVERSARY_REGISTRY_NAMESPACE="$INPUT_REGISTRY_NAMESPACE"; fi
 
 cleanup_auth() {
+  if [[ -n "${credential_file:-}" ]]; then rm -f "$credential_file"; fi
   if [[ "${owns_temp_profile:-false}" == true && -n "${profile:-}" ]]; then
     adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true
   fi
 }
+credential_file=""
 trap cleanup_auth EXIT
 
 if [[ "$auth_mode" == oidc ]]; then
@@ -158,6 +160,7 @@ if [[ "$auth_mode" == oidc ]]; then
   token="$(sed -n '1p' "$credential_file")"
   namespace="$(sed -n '2p' "$credential_file")"
   rm -f "$credential_file"
+  credential_file=""
   [[ "$token" == adv_ci_* && "$namespace" == "${INPUT_REGISTRY_NAMESPACE:-}" ]] || {
     echo "OIDC exchange returned unexpected credentials" >&2; exit 4;
   }

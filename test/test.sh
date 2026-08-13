@@ -189,11 +189,18 @@ compat_log="$tmp/compat.log"
 PATH="$fake_bin:$PATH" FAKE_LOG="$compat_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
   RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
   INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
-  INPUT_AUTH_MODE=oidc INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_AUTH_MODE=auto INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
   INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash "$root/push/scripts/push.sh" >/dev/null
 grep -Eq 'login profile=release-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$compat_log"
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=oidc INPUT_TOKEN='adv_sa_do-not-print-me' \
+  INPUT_REGISTRY_NAMESPACE=adversarylabs bash "$root/push/scripts/push.sh" >/dev/null 2>&1; then
+  echo "explicit OIDC accepted a service account token" >&2
+  exit 1
+fi
 
 named_log="$tmp/named.log"
 named_output="$tmp/named-output"

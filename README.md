@@ -116,7 +116,7 @@ The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yam
 
 ### Authentication
 
-The default `auth-mode: oidc` requests the job identity with audience `https://adversarylabs.ai`, exchanges it for a ten-minute team credential, and deletes the temporary CLI profile afterward. Add `permissions: id-token: write`, trust the repository under the team page, and pass the team slug as `registry-namespace`. This works both in GitHub Actions and native Depot CI workflows; Depot identities can also be pinned to the Depot organization ID.
+The default `auth-mode: auto` requests the job identity with audience `https://adversarylabs.ai`, exchanges it for a ten-minute team credential, and deletes the temporary CLI profile afterward. Add `permissions: id-token: write`, trust the repository under the team page, and pass the team slug as `registry-namespace`. This works both in GitHub Actions and native Depot CI workflows; Depot identities can also be pinned to the Depot organization ID. For v1 compatibility, `auto` selects token authentication when the `token` input is populated; explicit `oidc` never falls back to a long-lived token.
 
 For CI systems without compatible OIDC, `auth-mode: token` accepts an Adversary Labs service-account token. Create one with `registry:push`, store it as a CI secret, and pass it through the `token` input.
 
@@ -148,7 +148,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 | `push-latest` | no | `false` | Also push the same artifact with the `latest` tag. |
 | `api-url` | no | hosted API | API endpoint used for login and registry token exchange. |
 | `profile` | no | `push-action` for token/OAuth; CLI default for existing | CLI credential profile. |
-| `auth-mode` | no | `oidc` | `oidc` for GitHub Actions or Depot CI, `token` for a service account, `oauth` for device approval, or `existing` for preconfigured credentials. |
+| `auth-mode` | no | `auto` | `auto` uses a supplied token or otherwise OIDC; `oidc` requires GitHub Actions or Depot CI identity; `token`, `oauth`, and `existing` select those explicit flows. |
 | `token` | with token auth | — | Service-account token supplied through a CI secret. For v1 compatibility, supplying it without `auth-mode` selects token auth. |
 | `client-name` | no | `Adversary push action` | Name shown on the OAuth device-approval screen. |
 | `registry-host` | no | — | Registry host override. |
