@@ -149,19 +149,18 @@ function tokenize(source) {
     }
     if (char === "/") {
       const end = regexLiteralEnd(source, index)
-      // JavaScript's division-vs-regex ambiguity cannot be resolved from the
+      // JavaScript's division-vs-regex ambiguity cannot be resolved from one
       // preceding token alone (for example, a regex statement may follow an
-      // `if (...)` condition). Recognize normal regex contexts structurally,
-      // and conservatively mask any ambiguous slash span containing the exact
-      // constructor shape we edit. In the latter case verification remains the
-      // authority: overlooking executable code fails closed, while regex text
-      // is never rewritten.
-      if (end !== undefined && (
-        canStartRegex(tokens) || containsAdversaryInitializer(source.slice(index, end))
-      )) {
+      // `if (...)` condition). Recognize structurally valid regex contexts. If
+      // an ambiguous slash span itself contains constructor-shaped text, stop
+      // instead of either rewriting regex text or overlooking executable code.
+      if (end !== undefined && canStartRegex(tokens)) {
         tokens.push({ kind: "regex", value: source.slice(index, end), start: index, end })
         index = end
         continue
+      }
+      if (end !== undefined && containsAdversaryInitializer(source.slice(index, end))) {
+        throw new Error("ambiguous slash syntax around an Adversary initializer; update the runtime version explicitly")
       }
     }
     if (char === '"' || char === "'" || char === "`") {

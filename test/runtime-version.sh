@@ -114,6 +114,25 @@ grep -Fq 'if (false) /new Adversary({ version: "0.0.1" })/.test("")' "$regex_sta
 grep -Fq 'if (false) /new Adversary({ version: "0.0.1" })/.test("")' "$regex_statement/dist/index.js"
 node "$root/version/scripts/runtime.mjs" verify "$regex_statement" 0.0.2
 
+ambiguous_division="$tmp/ambiguous-division"
+mkdir -p "$ambiguous_division"
+write_node_fixture "$ambiguous_division"
+cat >"$ambiguous_division/src/index.ts" <<'EOF'
+import packageDocument from "../package.json" with { type: "json" }
+class Adversary { constructor(options) { Object.assign(this, options) } }
+const value = 2 / new Adversary({ version: "0.0.1", weight: 2 }).weight / 1
+export function createApp() {
+  return Reflect.construct(Adversary, [{ name: "test/runtime", version: packageDocument.version, value }])
+}
+EOF
+cp "$ambiguous_division/src/index.ts" "$ambiguous_division/dist/index.js"
+if (cd "$ambiguous_division" && node "$root/version/scripts/runtime.mjs" apply . 0.0.2 runtime-output.json) 2>"$tmp/ambiguous-division-error"; then
+  echo "runtime synchronization accepted ambiguous division syntax" >&2
+  exit 1
+fi
+grep -Fq 'ambiguous slash syntax' "$tmp/ambiguous-division-error"
+grep -Fq 'new Adversary({ version: "0.0.1"' "$ambiguous_division/src/index.ts"
+
 omitted="$tmp/omitted"
 mkdir -p "$omitted"
 write_node_fixture "$omitted"
