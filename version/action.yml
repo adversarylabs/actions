@@ -3,7 +3,7 @@ description: Synchronize release metadata and runtime identity from a tag, rebui
 
 inputs:
   tag:
-    description: Release tag in the form v followed by a semantic version.
+    description: Intended release tag in v-semver form; it need not exist when preparing on the release branch.
     required: true
   path:
     description: Path to the adversary project, relative to the workspace.

@@ -46,13 +46,15 @@ For Node adversaries, the runtime command must identify a project-relative JavaS
 
 Existing tag-triggered workflows remain supported, but they necessarily build from a working tree that differs from the tag when a version update is needed. For signed tag/runtime identity, run this action on the release branch *before* creating the tag: pass the intended `v<version>` as `tag`, wait for the action to push its commit, then create the annotated or signed tag at `${{ steps.version.outputs.commit }}`. The existing release workflow should become verify-and-publish-only for that tag. This ordering makes the tagged tree, rebuilt runtime, registry bytes, and protocol version identical.
 
+The preparation workflow should check out the release branch itself (not a tag) with full history, invoke `version` with the intended tag text, and hand its `commit` output to authorized signing/release tooling. That tooling must fetch the pushed commit and create the tag at that exact object; it should reject an existing tag or a branch that advanced unexpectedly. The tag-triggered workflow then validates and publishes without mutating source.
+
 During migration, do not create the tag until the version step succeeds. The backward-compatible tag-triggered mode still fixes and verifies the published runtime and main-branch metadata, but it cannot retroactively change the already-created tag object.
 
 ### Version inputs
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `tag` | yes | — | Release tag formatted as `v<semantic-version>`. |
+| `tag` | yes | — | Intended release tag formatted as `v<semantic-version>`; it may be prepared before the tag exists. |
 | `path` | no | `.` | Adversary project directory. |
 | `branch` | no | `main` | Branch that receives the version commit. |
 | `token` | yes | — | Fine-grained GitHub token with repository contents read/write. |
