@@ -1,5 +1,5 @@
 name: Version Adversary
-description: Synchronize adversary release metadata from a tag and commit it back idempotently.
+description: Synchronize release metadata and runtime identity from a tag, rebuild, verify, and commit idempotently.
 
 inputs:
   tag:

@@ -271,5 +271,6 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
 fi
 
 echo "push action tests passed"
+bash "$root/test/runtime-version.sh"
 bash "$root/test/version.sh"
 bash "$root/test/run.sh"

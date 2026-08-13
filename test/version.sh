@@ -22,13 +22,20 @@ cat >"$seed/adversary.yaml" <<'EOF'
 name: depotci
 version: 0.0.1
 description: Test adversary.
+runtime:
+  name: node
+  version: "22"
+  command:
+    - dist/index.js
 EOF
 cat >"$seed/package.json" <<'EOF'
 {
     "name" : "depotci",
 
     "version" : "0.1.0",
-    "private" : true
+    "private" : true,
+    "type" : "module",
+    "scripts" : { "build": "node build.mjs" }
 }
 EOF
 cat >"$seed/package-lock.json" <<'EOF'
@@ -44,8 +51,21 @@ cat >"$seed/package-lock.json" <<'EOF'
   }
 }
 EOF
+mkdir -p "$seed/src" "$seed/dist"
+cat >"$seed/src/index.ts" <<'EOF'
+class Adversary { constructor(options) { Object.assign(this, options) } }
+export function createApp() {
+  return new Adversary({ name: "depotci", version: "0.0.1" })
+}
+EOF
+cat >"$seed/build.mjs" <<'EOF'
+import { copyFile, mkdir } from "node:fs/promises"
+await mkdir("dist", { recursive: true })
+await copyFile("src/index.ts", "dist/index.js")
+EOF
+cp "$seed/src/index.ts" "$seed/dist/index.js"
 
-git -C "$seed" add adversary.yaml package.json package-lock.json
+git -C "$seed" add adversary.yaml package.json package-lock.json src/index.ts dist/index.js build.mjs
 git -C "$seed" commit -m initial >/dev/null
 initial_sha="$(git -C "$seed" rev-parse HEAD)"
 git -C "$seed" remote add origin "$remote"
@@ -71,6 +91,8 @@ bump_sha="$(sed -n 's/^commit=//p' "$first_output")"
 [[ "$(git --git-dir="$remote" show main:adversary.yaml | sed -n 's/^version:[[:space:]]*//p')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).version))')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package-lock.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).packages[""].version))')" == 0.0.2 ]]
+git --git-dir="$remote" show main:src/index.ts | grep -Fq 'version: "0.0.2"'
+git --git-dir="$remote" show main:dist/index.js | grep -Fq 'version: "0.0.2"'
 git --git-dir="$remote" show main:package.json | grep -Fq '    "name" : "depotci",'
 git --git-dir="$remote" show main:package.json | grep -Fq '    "version" : "0.0.2",'
 [[ "$(git -C "$seed" config --local user.name)" == test ]]

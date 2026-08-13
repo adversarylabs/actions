@@ -47,11 +47,19 @@ trap cleanup EXIT
 
 metadata_output="$work_temp/metadata"
 node "$action_path/scripts/metadata.mjs" apply "$project_path" "$version" "$sync_npm" >"$metadata_output"
+runtime_output="$work_temp/runtime.json"
+node "$action_path/scripts/runtime.mjs" apply "$project_path" "$version" "$runtime_output"
 name="$(sed -n '1p' "$metadata_output")"
 version_files=()
 while IFS= read -r file; do
   [[ -n "$file" ]] && version_files[${#version_files[@]}]="$file"
 done < <(sed -n '2,$p' "$metadata_output")
+while IFS= read -r file; do
+  [[ -n "$file" ]] && version_files[${#version_files[@]}]="$file"
+done < <(node -e '
+  const fs = require("fs");
+  for (const file of JSON.parse(fs.readFileSync(process.argv[1], "utf8")).files) console.log(file)
+' "$runtime_output")
 if [[ -z "$name" || ${#version_files[@]} -eq 0 ]]; then
   echo "release metadata did not return a name and version files" >&2
   exit 3
@@ -94,10 +102,13 @@ else
   verify_root="$work_temp/branch"
   mkdir -p -- "$verify_root"
   for file in "${version_files[@]}"; do
-    mkdir -p -- "$verify_root/$(dirname "$file")"
-    git show "origin/${branch}:${file}" >"$verify_root/$file"
+    if git cat-file -e "origin/${branch}:${file}" 2>/dev/null; then
+      mkdir -p -- "$verify_root/$(dirname "$file")"
+      git show "origin/${branch}:${file}" >"$verify_root/$file"
+    fi
   done
   node "$action_path/scripts/metadata.mjs" verify "$verify_root/$project_path" "$version" "$sync_npm" >/dev/null
+  node "$action_path/scripts/runtime.mjs" verify "$verify_root/$project_path" "$version" >/dev/null
   commit="$(git log -1 --format=%H --fixed-strings --grep="$message" "${tag_sha}..origin/${branch}" -- "${version_files[@]}")"
   echo "The ${version} release metadata bump is already on ${branch}; continuing this release rerun."
 fi
