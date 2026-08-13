@@ -35,14 +35,14 @@ inputs:
     required: false
     default: https://adversarylabs.ai/api
   profile:
-    description: CLI credential profile. Defaults to push-action for token and OAuth; existing mode uses the CLI default when omitted.
+    description: CLI credential profile. Defaults to push-action for OIDC, token, and OAuth; existing mode uses the CLI default when omitted.
     required: false
   auth-mode:
-    description: Authentication mode (token, oauth, or existing). Token is recommended for CI; OAuth uses interactive device login.
+    description: Authentication mode (oidc, token, oauth, or existing). OIDC uses a short-lived GitHub Actions or Depot CI identity.
     required: false
-    default: token
+    default: oidc
   token:
-    description: Service account token used by token authentication. Pass a Depot CI or GitHub Actions secret.
+    description: Service account token used by token authentication. For v1 compatibility, supplying it without auth-mode selects token auth.
     required: false
   client-name:
     description: Name shown while approving the OAuth device login.

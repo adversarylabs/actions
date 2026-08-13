@@ -80,8 +80,8 @@ case "$builder" in
   *) echo "builder must be local or docker" >&2; exit 2 ;;
 esac
 case "$auth_mode" in
-  none|token|oauth|existing) ;;
-  *) echo "auth-mode must be none, token, oauth, or existing" >&2; exit 2 ;;
+  none|oidc|token|oauth|existing) ;;
+  *) echo "auth-mode must be none, oidc, token, oauth, or existing" >&2; exit 2 ;;
 esac
 if [[ "$auth_mode" != token && -n "$token" ]]; then
   echo "token can only be used with auth-mode: token" >&2
@@ -133,7 +133,7 @@ if [[ -n "$fireworks_base_url" ]]; then export ADVERSARY_FIREWORKS_BASE_URL="$fi
 # Token/OAuth always use an ephemeral action-owned profile so cleanup cannot
 # remove a caller-owned profile that happens to share a name.
 owns_temp_profile=false
-if [[ "$auth_mode" == token || "$auth_mode" == oauth ]]; then
+if [[ "$auth_mode" == oidc || "$auth_mode" == token || "$auth_mode" == oauth ]]; then
   profile_prefix="${profile:-run-action}"
   profile="${profile_prefix}-${BASHPID:-$$}-${RANDOM}"
   owns_temp_profile=true
@@ -150,7 +150,20 @@ cleanup_auth() {
 }
 trap cleanup_auth EXIT
 
-if [[ "$auth_mode" == token ]]; then
+if [[ "$auth_mode" == oidc ]]; then
+  credential_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-ci-token.XXXXXX")"
+  chmod 600 "$credential_file"
+  OIDC_OPERATION=pull OIDC_OUTPUT="$credential_file" \
+    bash "$GITHUB_ACTION_PATH/../scripts/oidc.sh"
+  token="$(sed -n '1p' "$credential_file")"
+  namespace="$(sed -n '2p' "$credential_file")"
+  rm -f "$credential_file"
+  [[ "$token" == adv_ci_* && "$namespace" == "${INPUT_REGISTRY_NAMESPACE:-}" ]] || {
+    echo "OIDC exchange returned unexpected credentials" >&2; exit 4;
+  }
+  printf '%s\n' "$token" | adversary --profile "$profile" login --token-stdin --registry-namespace "$namespace"
+  token=''
+elif [[ "$auth_mode" == token ]]; then
   if [[ -z "$token" ]]; then
     echo "token is required with auth-mode: token" >&2
     exit 2

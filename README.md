@@ -24,14 +24,15 @@ The version action treats a `v`-prefixed release version as the source of truth.
 
 - name: Synchronize release metadata
   id: version
-  uses: adversarylabs/actions/version@v1.0.0
+  uses: adversarylabs/actions/version@v1.1.0
   with:
     tag: ${{ github.ref_name }}
     token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
 - name: Push
-  uses: adversarylabs/actions/push@v1.0.0
+  uses: adversarylabs/actions/push@v1.1.0
   with:
+    auth-mode: token
     token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
     registry-namespace: your-team-slug
     repository-name: ${{ steps.version.outputs.name }}
@@ -83,6 +84,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   push:
@@ -97,10 +99,9 @@ jobs:
 
       - name: Push
         id: push
-        uses: adversarylabs/actions/push@v1.0.0
+        uses: adversarylabs/actions/push@v1.1.0
         with:
           path: .
-          token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
           registry-namespace: your-team-slug
           repository-name: security-reviewer
           push-latest: true
@@ -115,14 +116,16 @@ The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yam
 
 ### Authentication
 
-The default `auth-mode: token` accepts an Adversary Labs service-account token. Create a token with `registry:push`, store it as `ADVERSARY_SERVICE_ACCOUNT_TOKEN` in Depot CI or GitHub Actions, and pass your team slug as `registry-namespace`. The action sends the token to `adversary login --token-stdin`, removes it from the environment before pushing, and deletes the temporary CLI profile afterward.
+The default `auth-mode: oidc` requests the job identity with audience `https://adversarylabs.ai`, exchanges it for a ten-minute team credential, and deletes the temporary CLI profile afterward. Add `permissions: id-token: write`, trust the repository under the team page, and pass the team slug as `registry-namespace`. This works both in GitHub Actions and native Depot CI workflows; Depot identities can also be pinned to the Depot organization ID.
+
+For CI systems without compatible OIDC, `auth-mode: token` accepts an Adversary Labs service-account token. Create one with `registry:push`, store it as a CI secret, and pass it through the `token` input.
 
 For an interactive run, set `auth-mode: oauth`. The CLI prints a device-login URL and code and waits for approval through your normal OAuth login. The device request currently expires after ten minutes.
 
 Set `auth-mode: existing` to skip login. This supports a runner with a preconfigured CLI profile or an external OCI registry authenticated through Docker’s credential store. When `profile` is omitted, the action uses the CLI's default profile; set `profile` explicitly to use a different preconfigured profile. Use `remote-reference` for an explicit registry destination:
 
 ```yaml
-- uses: adversarylabs/actions/push@v1.0.0
+- uses: adversarylabs/actions/push@v1.1.0
   with:
     cli-version: 2026.7.9-beta.1
     auth-mode: existing
@@ -145,8 +148,8 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 | `push-latest` | no | `false` | Also push the same artifact with the `latest` tag. |
 | `api-url` | no | hosted API | API endpoint used for login and registry token exchange. |
 | `profile` | no | `push-action` for token/OAuth; CLI default for existing | CLI credential profile. |
-| `auth-mode` | no | `token` | `token` for a service account, `oauth` for device approval, or `existing` for preconfigured credentials. |
-| `token` | with token auth | — | Service-account token supplied through a Depot CI or GitHub Actions secret. |
+| `auth-mode` | no | `oidc` | `oidc` for GitHub Actions or Depot CI, `token` for a service account, `oauth` for device approval, or `existing` for preconfigured credentials. |
+| `token` | with token auth | — | Service-account token supplied through a CI secret. For v1 compatibility, supplying it without `auth-mode` selects token auth. |
 | `client-name` | no | `Adversary push action` | Name shown on the OAuth device-approval screen. |
 | `registry-host` | no | — | Registry host override. |
 | `registry-namespace` | with token auth* | — | Team registry namespace. May be omitted when `remote-reference` is explicit. |
@@ -173,6 +176,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   review:
@@ -184,7 +188,7 @@ jobs:
 
       - name: Run adversaries
         id: review
-        uses: adversarylabs/actions/run@v1.0.0
+        uses: adversarylabs/actions/run@v1.1.0
         with:
           adversaries: |
             adversarylabs/dockerfile
@@ -192,8 +196,7 @@ jobs:
           path: .
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
-          auth-mode: token
-          token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
+          auth-mode: oidc
           registry-namespace: your-team-slug
           model-provider: openai
           model: gpt-4o
@@ -213,18 +216,17 @@ For pull-request change detection, pass `base` and `head` git SHAs or refs. Use 
 
 ### Authentication
 
-Default `auth-mode: none` skips login so public and local adversaries work without a token. For private registry pulls in CI, set `auth-mode: token` and pass a service-account token with pull access (not a push credential) from Depot CI or GitHub Actions secrets. The action sends the token to `adversary login --token-stdin`, clears it from the environment, and removes a unique temporary profile afterward so caller-owned profiles are never logged out.
+Default `auth-mode: none` skips login so public and local adversaries work without a token. For private pulls, prefer `auth-mode: oidc`, add `permissions: id-token: write`, trust the GitHub or Depot repository identity on the team page, and set `registry-namespace`. The exchanged pull credential lasts ten minutes and the action removes its unique temporary profile afterward.
 
 ```yaml
-- uses: adversarylabs/actions/run@v1.0.0
+- uses: adversarylabs/actions/run@v1.1.0
   with:
     adversaries: your-team/private-reviewer
-    auth-mode: token
-    token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
+    auth-mode: oidc
     registry-namespace: your-team-slug
 ```
 
-`auth-mode: oauth` uses interactive device login. `auth-mode: existing` uses a preconfigured CLI profile or Docker credential store and never logs in or out.
+Use `auth-mode: token` with a pull-scoped service-account token when OIDC is unavailable. `auth-mode: oauth` uses interactive device login. `auth-mode: existing` uses a preconfigured CLI profile or Docker credential store and never logs in or out.
 
 ### Model-backed adversaries
 
@@ -265,7 +267,7 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 | `fail-on-findings` | no | `true` | Fail the step when the review reports findings. |
 | `api-url` | no | hosted API | API endpoint used for login. |
 | `profile` | no | ephemeral `run-action-<id>` for token/OAuth; CLI default otherwise | For `existing`, the CLI profile to use (never logged out). For token/OAuth, used only as a name prefix for a unique action-owned profile that is removed after the step. |
-| `auth-mode` | no | `none` | `none`, `token`, `oauth`, or `existing`. |
+| `auth-mode` | no | `none` | `none`, `oidc`, `token`, `oauth`, or `existing`. |
 | `token` | with token auth | — | Pull-scoped service-account token secret. |
 | `client-name` | no | `Adversary run action` | Name shown on the OAuth device-approval screen. |
 | `registry-host` | no | — | Registry host override. |
@@ -285,7 +287,7 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 - **Push**: target source is built because packaging is required. Use only on reviewed code and protected release refs. Validation and packaging finish before authentication so target build scripts never see the service-account token. Prefer a push-scoped token.
 - **Run**: read-only review of the checked-out tree. Prefer a pull-scoped service-account token (or `auth-mode: none` for public/local adversaries). Do not reuse push credentials in ordinary review jobs.
 - The CLI archive is checksum-verified before execution. Pin `cli-version` in the caller workflow when exact toolchain reproducibility is required.
-- Service-account tokens are passed through standard input, removed from the environment before `run`/`push`, and temporary CLI profiles are removed afterward.
+- OIDC credentials expire after ten minutes. OIDC and service-account tokens are passed through standard input, removed from the environment before `run`/`push`, and temporary CLI profiles are removed afterward.
 - Model API keys are passed only through environment variables (never CLI flags) and are unset from action input env before the CLI is invoked.
 - Neither action requires write permission for the caller repository. Registry authority comes only from the supplied credential flow.
 

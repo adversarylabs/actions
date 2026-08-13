@@ -4,7 +4,7 @@ set -euo pipefail
 local_reference="${INPUT_LOCAL_REFERENCE:?local package reference is required}"
 profile="${INPUT_PROFILE:-}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
-auth_mode="${INPUT_AUTH_MODE:-token}"
+auth_mode="${INPUT_AUTH_MODE:-oidc}"
 client_name="${INPUT_CLIENT_NAME:-Adversary push action}"
 token="${INPUT_TOKEN:-}"
 remote_reference="${INPUT_REMOTE_REFERENCE:-}"
@@ -12,9 +12,16 @@ repository_name="${INPUT_REPOSITORY_NAME:-}"
 push_latest="${INPUT_PUSH_LATEST:-false}"
 unset INPUT_TOKEN
 
+# v1 originally defaulted to token auth. Keep callers that supplied the token
+# input without an explicit auth-mode working while making secretless OIDC the
+# default for new workflows.
+if [[ "$auth_mode" == oidc && -n "$token" ]]; then
+  auth_mode=token
+fi
+
 case "$auth_mode" in
-  token|oauth|existing) ;;
-  *) echo "auth-mode must be token, oauth, or existing" >&2; exit 2 ;;
+  oidc|token|oauth|existing) ;;
+  *) echo "auth-mode must be oidc, token, oauth, or existing" >&2; exit 2 ;;
 esac
 if [[ "$auth_mode" != token && -n "$token" ]]; then
   echo "token can only be used with auth-mode: token" >&2
@@ -67,12 +74,29 @@ fi
 if [[ -z "$profile" && "$auth_mode" != existing ]]; then
   profile=push-action
 fi
+if [[ "$auth_mode" == oidc || "$auth_mode" == token || "$auth_mode" == oauth ]]; then
+  profile="${profile}-${BASHPID:-$$}-${RANDOM}"
+fi
 
 export ADVERSARY_API_URL="$api_url"
 if [[ -n "${INPUT_REGISTRY_HOST:-}" ]]; then export ADVERSARY_REGISTRY_HOST="$INPUT_REGISTRY_HOST"; fi
 if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then export ADVERSARY_REGISTRY_NAMESPACE="$INPUT_REGISTRY_NAMESPACE"; fi
 
-if [[ "$auth_mode" == token ]]; then
+if [[ "$auth_mode" == oidc ]]; then
+  credential_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-ci-token.XXXXXX")"
+  chmod 600 "$credential_file"
+  OIDC_OPERATION=push OIDC_OUTPUT="$credential_file" \
+    bash "$GITHUB_ACTION_PATH/../scripts/oidc.sh"
+  token="$(sed -n '1p' "$credential_file")"
+  namespace="$(sed -n '2p' "$credential_file")"
+  rm -f "$credential_file"
+  [[ "$token" == adv_ci_* && "$namespace" == "${INPUT_REGISTRY_NAMESPACE:-}" ]] || {
+    echo "OIDC exchange returned unexpected credentials" >&2; exit 4;
+  }
+  trap 'adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true' EXIT
+  printf '%s\n' "$token" | adversary --profile "$profile" login --token-stdin --registry-namespace "$namespace"
+  token=''
+elif [[ "$auth_mode" == token ]]; then
   if [[ -z "$token" ]]; then
     echo "token is required with auth-mode: token" >&2
     exit 2
