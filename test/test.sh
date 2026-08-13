@@ -172,14 +172,33 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash "$root/push/scripts/push.sh" >"$tmp/push-stdout"
 
-grep -Fq 'login profile=release args=--token-stdin --registry-namespace adversarylabs' "$log"
-grep -Fq 'push profile=release args=example:1.0.0 registry.example/team/example:1.0.0 --format json' "$log"
-grep -Fq 'logout profile=release args=--local-only' "$log"
+grep -Eq 'login profile=release-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$log"
+grep -Eq 'push profile=release-[0-9]+-[0-9]+ args=example:1.0.0 registry.example/team/example:1.0.0 --format json' "$log"
+grep -Eq 'logout profile=release-[0-9]+-[0-9]+ args=--local-only' "$log"
 grep -Fq 'reference=registry.example/team/example:1.0.0' "$push_output"
 grep -Fq 'digest=sha256:image' "$push_output"
 grep -Fq 'manifest-digest=sha256:manifest' "$push_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/push-stdout" "$package_output" "$push_output"; then
   echo "service account token leaked into action output" >&2
+  exit 1
+fi
+
+# Existing v1 callers commonly supplied token without auth-mode. The new OIDC
+# default must preserve that behavior instead of rejecting their credential.
+compat_log="$tmp/compat.log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$compat_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=auto INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash "$root/push/scripts/push.sh" >/dev/null
+grep -Eq 'login profile=release-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$compat_log"
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=oidc INPUT_TOKEN='adv_sa_do-not-print-me' \
+  INPUT_REGISTRY_NAMESPACE=adversarylabs bash "$root/push/scripts/push.sh" >/dev/null 2>&1; then
+  echo "explicit OIDC accepted a service account token" >&2
   exit 1
 fi
 
@@ -192,8 +211,8 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$named_log" EXPECTED_TOKEN='adv_sa_do-not-print
   INPUT_CLIENT_NAME='GitHub Actions' INPUT_REMOTE_REFERENCE='' INPUT_REPOSITORY_NAME=depotci-adversary \
   INPUT_PUSH_LATEST=true INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash "$root/push/scripts/push.sh" >/dev/null
-grep -Fq 'push profile=release args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3 --format json' "$named_log"
-grep -Fq 'push profile=release args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest --format json' "$named_log"
+grep -Eq 'push profile=release-[0-9]+-[0-9]+ args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3 --format json' "$named_log"
+grep -Eq 'push profile=release-[0-9]+-[0-9]+ args=registry.adversarylabs.ai/library/depotci:0.0.3 registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest --format json' "$named_log"
 grep -Fq 'reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3' "$named_output"
 grep -Fq 'latest-reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest' "$named_output"
 
@@ -249,8 +268,8 @@ if PATH="$fake_bin:$PATH" FAKE_LOG="$failed_login_log" EXPECTED_TOKEN='adv_sa_do
   echo "push continued after a failed login" >&2
   exit 1
 fi
-grep -Fq 'login profile=release args=--token-stdin --registry-namespace adversarylabs' "$failed_login_log"
-grep -Fq 'logout profile=release args=--local-only' "$failed_login_log"
+grep -Eq 'login profile=release-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$failed_login_log"
+grep -Eq 'logout profile=release-[0-9]+-[0-9]+ args=--local-only' "$failed_login_log"
 if grep -Fq 'adv_sa_do-not-print-me' "$failed_login_log" "$tmp/failed-login-output"; then
   echo "failed login leaked the service account token" >&2
   exit 1
@@ -274,3 +293,4 @@ echo "push action tests passed"
 bash "$root/test/runtime-version.sh"
 bash "$root/test/version.sh"
 bash "$root/test/run.sh"
+bash "$root/test/oidc.sh"
