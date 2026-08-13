@@ -147,6 +147,14 @@ function tokenize(source) {
       index = end + 2
       continue
     }
+    if (char === "/" && canStartRegex(tokens)) {
+      const end = regexLiteralEnd(source, index)
+      if (end !== undefined) {
+        tokens.push({ kind: "regex", value: source.slice(index, end), start: index, end })
+        index = end
+        continue
+      }
+    }
     if (char === '"' || char === "'" || char === "`") {
       const start = index
       const quote = char
@@ -180,6 +188,45 @@ function tokenize(source) {
     index += 1
   }
   return tokens
+}
+
+function canStartRegex(tokens) {
+  const previous = tokens.at(-1)
+  if (!previous) return true
+  if (previous.kind === "identifier") {
+    return new Set([
+      "await", "case", "delete", "do", "else", "in", "instanceof", "of",
+      "return", "throw", "typeof", "void", "yield",
+    ]).has(previous.value)
+  }
+  if (previous.kind !== "punctuation") return false
+  return "([{,;:=!?&|+-*%^~<>".includes(previous.value)
+}
+
+function regexLiteralEnd(source, start) {
+  let inCharacterClass = false
+  for (let index = start + 1; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === "\\") {
+      index += 1
+      continue
+    }
+    if (char === "\n" || char === "\r") return undefined
+    if (char === "[") {
+      inCharacterClass = true
+      continue
+    }
+    if (char === "]" && inCharacterClass) {
+      inCharacterClass = false
+      continue
+    }
+    if (char !== "/" || inCharacterClass) continue
+
+    index += 1
+    while (/[A-Za-z]/.test(source[index] ?? "")) index += 1
+    return index
+  }
+  return undefined
 }
 
 function buildNodeProject(directory) {

@@ -77,6 +77,7 @@ write_node_fixture "$inferred"
 cat >"$inferred/src/index.ts" <<'EOF'
 import packageDocument from "../package.json" with { type: "json" }
 class Adversary { constructor(options) { Object.assign(this, options) } }
+export const constructorExample = /new Adversary({ version: "0.0.1" })/
 export function createApp() {
   return new Adversary({ name: "test/runtime", version: packageDocument.version })
 }
@@ -88,6 +89,8 @@ git -C "$inferred" commit -m initial >/dev/null
   node "$root/version/scripts/runtime.mjs" apply . 0.0.2 runtime-output.json
 )
 grep -Fq 'version: packageDocument.version' "$inferred/src/index.ts"
+grep -Fq '/new Adversary({ version: "0.0.1" })/' "$inferred/src/index.ts"
+grep -Fq '/new Adversary({ version: "0.0.1" })/' "$inferred/dist/index.js"
 node "$root/version/scripts/runtime.mjs" verify "$inferred" 0.0.2
 
 omitted="$tmp/omitted"

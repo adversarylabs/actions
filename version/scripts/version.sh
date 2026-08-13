@@ -39,11 +39,22 @@ cd "$workspace"
 branch_key="$(printf '%s' "$branch" | git hash-object --stdin)"
 work_temp="$(mktemp -d "$runner_temp/adversary-version-${branch_key}.XXXXXX")"
 credential_key="http.https://github.com/.extraheader"
+scrub_git_credentials() {
+  while IFS= read -r key; do
+    [[ -n "$key" ]] && git config --local --unset-all "$key" >/dev/null 2>&1 || true
+  done < <(git config --local --name-only --get-regexp '^http\..*\.extraheader$' 2>/dev/null || true)
+  git config --local --unset-all credential.helper >/dev/null 2>&1 || true
+}
 cleanup() {
-  git config --local --unset-all "$credential_key" >/dev/null 2>&1 || true
+  scrub_git_credentials
   rm -rf -- "$work_temp"
 }
 trap cleanup EXIT
+
+# The checked-out repository controls its build and runtime module. Remove
+# checkout-provided Git credentials before executing any of that code.
+scrub_git_credentials
+unset GIT_ASKPASS SSH_ASKPASS GITHUB_TOKEN GH_TOKEN
 
 metadata_output="$work_temp/metadata"
 node "$action_path/scripts/metadata.mjs" apply "$project_path" "$version" "$sync_npm" >"$metadata_output"
@@ -68,9 +79,9 @@ fi
 auth_header="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
 token=''
 git config --local "$credential_key" "AUTHORIZATION: basic $auth_header"
-auth_header=''
 
 git fetch --no-tags origin "$branch"
+scrub_git_credentials
 tag_sha="$(git rev-parse "${GITHUB_SHA:?GITHUB_SHA is required}^{commit}")"
 branch_sha="$(git rev-parse "origin/${branch}")"
 message="chore: bump adversary version to ${version} [skip-ci]"
@@ -86,7 +97,9 @@ if [[ "$tag_sha" == "$branch_sha" ]]; then
       -c user.email=adversarylabs-release@users.noreply.github.com \
       commit -m "$message"
     commit="$(git rev-parse HEAD)"
+    git config --local "$credential_key" "AUTHORIZATION: basic $auth_header"
     git push origin "HEAD:refs/heads/${branch}"
+    scrub_git_credentials
     changed=true
   fi
 else
@@ -112,6 +125,7 @@ else
   commit="$(git log -1 --format=%H --fixed-strings --grep="$message" "${tag_sha}..origin/${branch}" -- "${version_files[@]}")"
   echo "The ${version} release metadata bump is already on ${branch}; continuing this release rerun."
 fi
+auth_header=''
 
 cleanup
 trap - EXIT

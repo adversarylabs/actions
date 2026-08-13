@@ -53,8 +53,15 @@ cat >"$seed/package-lock.json" <<'EOF'
 EOF
 mkdir -p "$seed/src" "$seed/dist"
 cat >"$seed/src/index.ts" <<'EOF'
+import { execFileSync } from "node:child_process"
 class Adversary { constructor(options) { Object.assign(this, options) } }
 export function createApp() {
+  try {
+    const credential = execFileSync("git", ["config", "--local", "--get-all", "http.https://github.com/.extraheader"], { encoding: "utf8" })
+    if (credential.trim()) throw new Error("repository code could read Git credentials")
+  } catch (error) {
+    if (error?.message === "repository code could read Git credentials") throw error
+  }
   return new Adversary({ name: "depotci", version: "0.0.1" })
 }
 EOF
@@ -71,6 +78,9 @@ initial_sha="$(git -C "$seed" rev-parse HEAD)"
 git -C "$seed" remote add origin "$remote"
 git -C "$seed" push -u origin main >/dev/null
 git --git-dir="$remote" symbolic-ref HEAD refs/heads/main
+# Simulate actions/checkout's default persisted credential. Repository build
+# code must never run while this or the release credential is readable.
+git -C "$seed" config --local http.https://github.com/.extraheader 'AUTHORIZATION: basic checkout-do-not-expose'
 
 runner="$tmp/runner"
 mkdir -p "$runner"
