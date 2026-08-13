@@ -147,9 +147,18 @@ function tokenize(source) {
       index = end + 2
       continue
     }
-    if (char === "/" && canStartRegex(tokens)) {
+    if (char === "/") {
       const end = regexLiteralEnd(source, index)
-      if (end !== undefined) {
+      // JavaScript's division-vs-regex ambiguity cannot be resolved from the
+      // preceding token alone (for example, a regex statement may follow an
+      // `if (...)` condition). Recognize normal regex contexts structurally,
+      // and conservatively mask any ambiguous slash span containing the exact
+      // constructor shape we edit. In the latter case verification remains the
+      // authority: overlooking executable code fails closed, while regex text
+      // is never rewritten.
+      if (end !== undefined && (
+        canStartRegex(tokens) || containsAdversaryInitializer(source.slice(index, end))
+      )) {
         tokens.push({ kind: "regex", value: source.slice(index, end), start: index, end })
         index = end
         continue
@@ -193,6 +202,7 @@ function tokenize(source) {
 function canStartRegex(tokens) {
   const previous = tokens.at(-1)
   if (!previous) return true
+  if (previous.value === ")" && closesControlCondition(tokens)) return true
   if (previous.kind === "identifier") {
     return new Set([
       "await", "case", "delete", "do", "else", "in", "instanceof", "of",
@@ -201,6 +211,24 @@ function canStartRegex(tokens) {
   }
   if (previous.kind !== "punctuation") return false
   return "([{,;:=!?&|+-*%^~<>".includes(previous.value)
+}
+
+function closesControlCondition(tokens) {
+  let depth = 0
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (tokens[index].value === ")") depth += 1
+    if (tokens[index].value !== "(") continue
+    depth -= 1
+    if (depth !== 0) continue
+    const keyword = tokens[index - 1]
+    return keyword?.kind === "identifier" &&
+      new Set(["catch", "for", "if", "switch", "while", "with"]).has(keyword.value)
+  }
+  return false
+}
+
+function containsAdversaryInitializer(source) {
+  return /\bnew\s+Adversary\s*\(\s*\{/.test(source)
 }
 
 function regexLiteralEnd(source, start) {

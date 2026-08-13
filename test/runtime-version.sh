@@ -93,6 +93,27 @@ grep -Fq '/new Adversary({ version: "0.0.1" })/' "$inferred/src/index.ts"
 grep -Fq '/new Adversary({ version: "0.0.1" })/' "$inferred/dist/index.js"
 node "$root/version/scripts/runtime.mjs" verify "$inferred" 0.0.2
 
+regex_statement="$tmp/regex-statement"
+mkdir -p "$regex_statement"
+write_node_fixture "$regex_statement"
+cat >"$regex_statement/src/index.ts" <<'EOF'
+import packageDocument from "../package.json" with { type: "json" }
+class Adversary { constructor(options) { Object.assign(this, options) } }
+if (false) /new Adversary({ version: "0.0.1" })/.test("")
+export function createApp() {
+  return Reflect.construct(Adversary, [{ name: "test/runtime", version: packageDocument.version }])
+}
+EOF
+git -C "$regex_statement" add .
+git -C "$regex_statement" commit -m initial >/dev/null
+(
+  cd "$regex_statement"
+  node "$root/version/scripts/runtime.mjs" apply . 0.0.2 runtime-output.json
+)
+grep -Fq 'if (false) /new Adversary({ version: "0.0.1" })/.test("")' "$regex_statement/src/index.ts"
+grep -Fq 'if (false) /new Adversary({ version: "0.0.1" })/.test("")' "$regex_statement/dist/index.js"
+node "$root/version/scripts/runtime.mjs" verify "$regex_statement" 0.0.2
+
 omitted="$tmp/omitted"
 mkdir -p "$omitted"
 write_node_fixture "$omitted"
