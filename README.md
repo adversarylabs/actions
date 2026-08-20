@@ -72,7 +72,7 @@ During migration, do not create the tag until the version step succeeds. The bac
 
 ## Push an adversary
 
-The push action installs an Adversary CLI release, verifies the release archive against `checksums.txt`, validates the project, packages it, and pushes both the OCI image manifest and adversary-manifest referrer.
+The push action installs an Adversary CLI release, verifies the release archive against `checksums.txt`, validates the project, packages it, and pushes both the OCI image manifest and adversary-manifest referrer. Private publishes to the authenticated team namespace on the Adversary Labs registry are signed automatically; the publisher receives only the signature and public team delegation, never a private key.
 
 ```yaml
 name: Push adversary
@@ -163,10 +163,12 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 | `manifest-digest` | Pushed adversary-manifest referrer digest. |
 | `local-reference` | Canonical reference produced by the package step. |
 | `latest-reference` | Pushed `latest` reference when `push-latest` is enabled. |
+| `namespace-signature-digest` | Platform-issued namespace signature referrer digest for a hosted private publish; empty for external or public repositories. |
+| `namespace-trust-digest` | Platform-endorsed team trust referrer digest for a hosted private publish; empty for external or public repositories. |
 
 ## Run adversaries
 
-The run action installs an Adversary CLI release, optionally authenticates for private registry pulls, and executes `adversary run` against the checked-out source. It maps every active `adversary run` flag and supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
+The run action installs an Adversary CLI release, optionally authenticates for private registry pulls, and executes `adversary run` against the checked-out source. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It maps every active `adversary run` flag and supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
 
 ```yaml
 name: Adversary review
