@@ -9,7 +9,7 @@ require_bool() {
   esac
 }
 
-adversaries_raw="${INPUT_ADVERSARIES:-}"
+adversaries_raw="${INPUT_ADVERSARIES:-auto}"
 path="${INPUT_PATH:-.}"
 base="${INPUT_BASE:-}"
 head="${INPUT_HEAD:-}"
@@ -40,24 +40,27 @@ token="${INPUT_TOKEN:-}"
 client_name="${INPUT_CLIENT_NAME:-Adversary run action}"
 unset INPUT_TOKEN INPUT_MODEL_API_KEY
 
-if [[ -z "${adversaries_raw//[[:space:]]/}" ]]; then
-  echo "adversaries is required" >&2
-  exit 2
-fi
-
-# shellcheck disable=SC2206
 adversaries=()
-while IFS= read -r line; do
-  # shellcheck disable=SC2086
-  for ref in $line; do
-    [[ -n "$ref" ]] || continue
-    adversaries+=("$ref")
-  done
-done <<<"$adversaries_raw"
+auto_select=false
+adversaries_value="$(printf '%s' "$adversaries_raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+if [[ -z "$adversaries_value" || "$adversaries_value" == auto ]]; then
+  auto_select=true
+else
+  while IFS= read -r line; do
+    # shellcheck disable=SC2086
+    for ref in $line; do
+      [[ -n "$ref" ]] || continue
+      if [[ "$ref" == auto ]]; then
+        echo "auto cannot be combined with explicit adversary references" >&2
+        exit 2
+      fi
+      adversaries+=("$ref")
+    done
+  done <<<"$adversaries_value"
 
-if [[ ${#adversaries[@]} -eq 0 ]]; then
-  echo "adversaries is required" >&2
-  exit 2
+  if [[ ${#adversaries[@]} -eq 0 ]]; then
+    auto_select=true
+  fi
 fi
 
 require_bool all-files "$all_files"
@@ -102,6 +105,16 @@ fi
 if [[ "$shell_mode" == true && ${#adversaries[@]} -gt 1 ]]; then
   echo "shell cannot be combined with multiple adversaries" >&2
   exit 2
+fi
+if [[ "$auto_select" == true ]]; then
+  if [[ "$builder" != local ]]; then
+    echo "builder cannot be used with automatic selection" >&2
+    exit 2
+  fi
+  if [[ "$build" == true || "$force" == true || "$keep_temp" == true || "$no_network" == true || "$verbose" == true || "$shell_mode" == true || -n "$build_timeout" ]]; then
+    echo "build, force, keep-temp, no-network, verbose, shell, and build-timeout apply only to explicit adversary references" >&2
+    exit 2
+  fi
 fi
 if [[ ! -d "$path" ]]; then
   echo "Source path does not exist: ${path}" >&2
@@ -186,23 +199,23 @@ elif [[ "$auth_mode" == oauth ]]; then
 fi
 
 run_args=(run)
-run_args+=("${adversaries[@]}")
+if [[ "$auto_select" == false ]]; then run_args+=("${adversaries[@]}"); fi
 run_args+=(--path "$path")
-run_args+=(--builder "$builder")
+if [[ "$auto_select" == false ]]; then run_args+=(--builder "$builder"); fi
 run_args+=(--format "$format")
 if [[ -n "$base" ]]; then run_args+=(--base "$base"); fi
 if [[ -n "$head" ]]; then run_args+=(--head "$head"); fi
 if [[ "$all_files" == true ]]; then run_args+=(--all-files); fi
-if [[ "$build" == true ]]; then run_args+=(--build); fi
-if [[ "$force" == true ]]; then run_args+=(--force); fi
-if [[ "$keep_temp" == true ]]; then run_args+=(--keep-temp); fi
-if [[ "$no_network" == true ]]; then run_args+=(--no-network); fi
-if [[ "$verbose" == true ]]; then run_args+=(--verbose); fi
+if [[ "$auto_select" == false && "$build" == true ]]; then run_args+=(--build); fi
+if [[ "$auto_select" == false && "$force" == true ]]; then run_args+=(--force); fi
+if [[ "$auto_select" == false && "$keep_temp" == true ]]; then run_args+=(--keep-temp); fi
+if [[ "$auto_select" == false && "$no_network" == true ]]; then run_args+=(--no-network); fi
+if [[ "$auto_select" == false && "$verbose" == true ]]; then run_args+=(--verbose); fi
 if [[ "$include_suppressed" == true ]]; then run_args+=(--include-suppressed); fi
-if [[ "$shell_mode" == true ]]; then run_args+=(--shell); fi
+if [[ "$auto_select" == false && "$shell_mode" == true ]]; then run_args+=(--shell); fi
 if [[ "$allow_unsafe_host_execution" == true ]]; then run_args+=(--allow-unsafe-host-execution); fi
 if [[ -n "$timeout" ]]; then run_args+=(--timeout "$timeout"); fi
-if [[ -n "$build_timeout" ]]; then run_args+=(--build-timeout "$build_timeout"); fi
+if [[ "$auto_select" == false && -n "$build_timeout" ]]; then run_args+=(--build-timeout "$build_timeout"); fi
 if [[ -n "$model_provider" ]]; then run_args+=(--model-provider "$model_provider"); fi
 if [[ -n "$model" ]]; then run_args+=(--model "$model"); fi
 

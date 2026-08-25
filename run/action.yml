@@ -1,10 +1,11 @@
 name: Run Adversary
-description: Install the Adversary CLI and run one or more adversaries against a local repository.
+description: Install the Adversary CLI and automatically select or explicitly run adversaries against a local repository.
 
 inputs:
   adversaries:
-    description: One or more adversary references separated by whitespace or newlines (for example adversarylabs/dockerfile or a local path).
-    required: true
+    description: Use auto to pull accessible adversaries and select those matching the change, or provide one or more references separated by whitespace or newlines.
+    required: false
+    default: auto
   cli-version:
     description: Exact Adversary CLI release tag to install. When omitted, use GitHub's latest stable release.
     required: false

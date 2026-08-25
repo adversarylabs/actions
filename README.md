@@ -168,7 +168,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 ## Run adversaries
 
-The run action installs an Adversary CLI release, optionally authenticates for private registry pulls, and executes `adversary run` against the checked-out source. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It maps every active `adversary run` flag and supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
+The run action installs an Adversary CLI release, optionally authenticates for registry pulls, and executes `adversary run` against the checked-out source. By default it mirrors the CLI's automatic mode: it pulls accessible adversaries, detects which ones match the change, and runs the selected set. Set `adversaries` to one or more references to run an explicit set instead. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
 
 ```yaml
 name: Adversary review
@@ -190,11 +190,8 @@ jobs:
 
       - name: Run adversaries
         id: review
-        uses: adversarylabs/actions/run@v1.1.0
+        uses: adversarylabs/actions/run@v1
         with:
-          adversaries: |
-            adversarylabs/dockerfile
-            adversarylabs/go-cli
           path: .
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
@@ -213,6 +210,26 @@ jobs:
 ```
 
 When `cli-version` is omitted, the action installs the latest stable Adversary CLI release (same resolution rules as push). Pin `cli-version` and the action ref for reproducible CI. `path` defaults to `.`.
+
+Automatic selection is the default. These are equivalent:
+
+```yaml
+- uses: adversarylabs/actions/run@v1
+
+- uses: adversarylabs/actions/run@v1
+  with:
+    adversaries: auto
+```
+
+To bypass automatic selection, provide explicit references. Each explicit adversary still applies its own changed-file trigger unless `force: true` is set:
+
+```yaml
+- uses: adversarylabs/actions/run@v1
+  with:
+    adversaries: |
+      web/nextjs
+      web/react
+```
 
 For pull-request change detection, pass `base` and `head` git SHAs or refs. Use `all-files: true` for a full-tree scan (for example on `push` to main). `base`/`head` and `all-files` cannot be combined.
 
@@ -242,7 +259,7 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `adversaries` | yes | — | One or more adversary refs (whitespace or newlines). |
+| `adversaries` | no | `auto` | `auto` to pull and select matching accessible adversaries, or one or more explicit refs (whitespace or newlines). |
 | `cli-version` | no | latest stable release | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Source directory to review. |
 | `base` | no | — | Git base ref for change detection. |

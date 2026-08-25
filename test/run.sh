@@ -10,6 +10,13 @@ bash -n "$root/run/scripts/run.sh"
 grep -Fq 'name: Run Adversary' "$root/run/action.yml"
 grep -Fq 'using: composite' "$root/run/action.yml"
 grep -Fq 'adversaries:' "$root/run/action.yml"
+adversaries_input="$(sed -n '/^  adversaries:/,/^  cli-version:/p' "$root/run/action.yml")"
+grep -Fq 'required: false' <<<"$adversaries_input"
+grep -Fq 'default: auto' <<<"$adversaries_input"
+if grep -Fq 'required: true' <<<"$adversaries_input"; then
+  echo "adversaries is still required" >&2
+  exit 1
+fi
 grep -Fq 'model-provider:' "$root/run/action.yml"
 grep -Fq 'model-api-key:' "$root/run/action.yml"
 grep -Fq 'auth-mode:' "$root/run/action.yml"
@@ -141,6 +148,28 @@ grep -Fq 'exit-code=0' "$run_output"
 grep -Fq 'outcome=success' "$run_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/run-stdout" "$run_output"; then
   echo "service account token leaked into run action output" >&2
+  exit 1
+fi
+
+auto_log="$tmp/auto.log"
+auto_output="$tmp/auto-output"
+: >"$auto_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$auto_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$auto_output" \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_BASE=main INPUT_HEAD=HEAD \
+  INPUT_ALL_FILES=false INPUT_BUILDER=local INPUT_BUILD=false INPUT_FORCE=false \
+  INPUT_FORMAT=text INPUT_KEEP_TEMP=false INPUT_NO_NETWORK=false INPUT_VERBOSE=false \
+  INPUT_INCLUDE_SUPPRESSED=false INPUT_SHELL=false INPUT_ALLOW_UNSAFE_HOST_EXECUTION=false \
+  INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
+  INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
+  INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+
+grep -Fq 'run profile=default args=--path . --format text --base main --head HEAD' "$auto_log"
+grep -Fq 'exit-code=0' "$auto_output"
+if grep -Fq -- '--builder' "$auto_log"; then
+  echo "automatic selection passed an explicit-only builder flag" >&2
   exit 1
 fi
 
@@ -281,10 +310,25 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$findings_log" RUN_EXIT=1 RUNNER_TEMP="$runner"
 grep -Fq 'exit-code=1' "$soft_output"
 grep -Fq 'outcome=findings' "$soft_output"
 
-if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+blank_auto_log="$tmp/blank-auto.log"
+blank_auto_output="$tmp/blank-auto-output"
+: >"$blank_auto_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$blank_auto_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$blank_auto_output" \
   INPUT_ADVERSARIES='' INPUT_PATH=. INPUT_AUTH_MODE=none \
+  bash "$root/run/scripts/run.sh" >/dev/null
+grep -Fq 'run profile=default args=--path . --format text' "$blank_auto_log"
+
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  INPUT_ADVERSARIES='auto adversarylabs/example' INPUT_PATH=. INPUT_AUTH_MODE=none \
   bash "$root/run/scripts/run.sh" >/dev/null 2>&1; then
-  echo "run accepted empty adversaries" >&2
+  echo "run accepted auto combined with an explicit adversary" >&2
+  exit 1
+fi
+
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_FORCE=true \
+  bash "$root/run/scripts/run.sh" >/dev/null 2>&1; then
+  echo "automatic selection accepted an explicit-only flag" >&2
   exit 1
 fi
 
