@@ -20,9 +20,20 @@ inputs:
     description: Git head ref for change detection (defaults to HEAD when base is set).
     required: false
   all-files:
-    description: Scan the entire target instead of inferring a change (true or false).
+    description: Scan the entire target instead of the inferred pull-request or branch diff (true or false).
     required: false
     default: "false"
+  github-review:
+    description: Post findings as a GitHub pull-request review (auto, true, or false). Auto enables reviews for pull_request events.
+    required: false
+    default: auto
+  github-submit:
+    description: Submit the GitHub review as an informational comment instead of leaving it pending (true or false).
+    required: false
+    default: "true"
+  github-token:
+    description: GitHub token used to post the pull-request review. Defaults to github.token.
+    required: false
   builder:
     description: Build mechanism for local adversaries (local or docker).
     required: false
@@ -88,9 +99,9 @@ inputs:
     description: Optional Fireworks-compatible base URL override (ADVERSARY_FIREWORKS_BASE_URL).
     required: false
   fail-on-findings:
-    description: Fail the step when the review reports findings (true or false). When false, findings still set outputs but exit 0.
+    description: Fail the step when the review reports findings (true or false). Defaults to false so findings are review feedback rather than infrastructure failures.
     required: false
-    default: "true"
+    default: "false"
   api-url:
     description: Adversary Labs API URL.
     required: false
@@ -148,6 +159,8 @@ runs:
         INPUT_BASE: ${{ inputs.base }}
         INPUT_HEAD: ${{ inputs.head }}
         INPUT_ALL_FILES: ${{ inputs.all-files }}
+        INPUT_GITHUB_REVIEW: ${{ inputs.github-review }}
+        INPUT_GITHUB_SUBMIT: ${{ inputs.github-submit }}
         INPUT_BUILDER: ${{ inputs.builder }}
         INPUT_BUILD: ${{ inputs.build }}
         INPUT_FORCE: ${{ inputs.force }}
@@ -174,6 +187,7 @@ runs:
         INPUT_CLIENT_NAME: ${{ inputs.client-name }}
         INPUT_REGISTRY_HOST: ${{ inputs.registry-host }}
         INPUT_REGISTRY_NAMESPACE: ${{ inputs.registry-namespace }}
+        GITHUB_TOKEN: ${{ inputs.github-token || github.token }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"
 
 branding:

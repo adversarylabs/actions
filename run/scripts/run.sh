@@ -14,6 +14,8 @@ path="${INPUT_PATH:-.}"
 base="${INPUT_BASE:-}"
 head="${INPUT_HEAD:-}"
 all_files="${INPUT_ALL_FILES:-false}"
+github_review="${INPUT_GITHUB_REVIEW:-auto}"
+github_submit="${INPUT_GITHUB_SUBMIT:-true}"
 builder="${INPUT_BUILDER:-local}"
 build="${INPUT_BUILD:-false}"
 force="${INPUT_FORCE:-false}"
@@ -32,7 +34,7 @@ model_api_key="${INPUT_MODEL_API_KEY:-}"
 openai_base_url="${INPUT_OPENAI_BASE_URL:-}"
 anthropic_base_url="${INPUT_ANTHROPIC_BASE_URL:-}"
 fireworks_base_url="${INPUT_FIREWORKS_BASE_URL:-}"
-fail_on_findings="${INPUT_FAIL_ON_FINDINGS:-true}"
+fail_on_findings="${INPUT_FAIL_ON_FINDINGS:-false}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
 profile="${INPUT_PROFILE:-}"
 auth_mode="${INPUT_AUTH_MODE:-none}"
@@ -64,6 +66,7 @@ else
 fi
 
 require_bool all-files "$all_files"
+require_bool github-submit "$github_submit"
 require_bool build "$build"
 require_bool force "$force"
 require_bool keep-temp "$keep_temp"
@@ -73,6 +76,17 @@ require_bool include-suppressed "$include_suppressed"
 require_bool shell "$shell_mode"
 require_bool allow-unsafe-host-execution "$allow_unsafe_host_execution"
 require_bool fail-on-findings "$fail_on_findings"
+
+case "$github_review" in
+  auto)
+    github_review_enabled=false
+    if [[ "${GITHUB_EVENT_NAME:-}" == pull_request || "${GITHUB_EVENT_NAME:-}" == pull_request_target || "${GITHUB_REF:-}" == refs/pull/* ]]; then
+      github_review_enabled=true
+    fi
+    ;;
+  true|false) github_review_enabled="$github_review" ;;
+  *) echo "github-review must be auto, true, or false" >&2; exit 2 ;;
+esac
 
 case "$format" in
   text|json) ;;
@@ -218,6 +232,10 @@ if [[ -n "$timeout" ]]; then run_args+=(--timeout "$timeout"); fi
 if [[ "$auto_select" == false && -n "$build_timeout" ]]; then run_args+=(--build-timeout "$build_timeout"); fi
 if [[ -n "$model_provider" ]]; then run_args+=(--model-provider "$model_provider"); fi
 if [[ -n "$model" ]]; then run_args+=(--model "$model"); fi
+if [[ "$github_review_enabled" == true ]]; then
+  run_args+=(--github-review)
+  if [[ "$github_submit" == true ]]; then run_args+=(--github-submit); fi
+fi
 
 result_file=""
 findings_count=""

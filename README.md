@@ -168,7 +168,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 ## Run adversaries
 
-The run action installs an Adversary CLI release, optionally authenticates for registry pulls, and executes `adversary run` against the checked-out source. By default it mirrors the CLI's automatic mode: it pulls accessible adversaries, detects which ones match the change, and runs the selected set. Set `adversaries` to one or more references to run an explicit set instead. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
+The run action installs an Adversary CLI release, optionally authenticates for registry pulls, and executes `adversary run` against the checked-out source. Pull-request runs default to the PR diff, automatically post findings as a submitted GitHub review, and do not fail the check merely because findings exist. Configuration, authentication, network, and execution failures still fail the step. The action pulls accessible adversaries, detects which ones match the change, and runs the selected set. Set `adversaries` to one or more references to run an explicit set instead, or set `all-files: true` to review the entire repository. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
 
 ```yaml
 name: Adversary review
@@ -179,6 +179,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: write
 
 jobs:
   review:
@@ -193,8 +194,6 @@ jobs:
         uses: adversarylabs/actions/run@v1
         with:
           path: .
-          base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
           auth-mode: oidc
           registry-namespace: your-team-slug
           model-provider: openai
@@ -231,14 +230,18 @@ To bypass automatic selection, provide explicit references. Each explicit advers
       web/react
 ```
 
-For pull-request change detection, pass `base` and `head` git SHAs or refs. Use `all-files: true` for a full-tree scan (for example on `push` to main). `base`/`head` and `all-files` cannot be combined.
+Pull-request scope is inferred from the CI environment. Use `base` and `head` to override the inferred diff, or `all-files: true` to opt into a full-repository scan. `base`/`head` and `all-files` cannot be combined.
+
+### Pull-request reviews
+
+On `pull_request` and `pull_request_target` events, `github-review: auto` posts findings through GitHub's GraphQL review API and `github-submit: true` submits the review as an informational comment. Grant `pull-requests: write`; the action uses `github.token` unless `github-token` is supplied. Set `github-review: false` to keep results in the job log only.
 
 ### Authentication
 
 Default `auth-mode: none` skips login so public and local adversaries work without a token. For private pulls, prefer `auth-mode: oidc`, add `permissions: id-token: write`, trust the GitHub or Depot repository identity on the team page, and set `registry-namespace`. The exchanged pull credential lasts ten minutes and the action removes its unique temporary profile afterward.
 
 ```yaml
-- uses: adversarylabs/actions/run@v1.1.0
+- uses: adversarylabs/actions/run@v1
   with:
     adversaries: your-team/private-reviewer
     auth-mode: oidc
@@ -253,7 +256,7 @@ Provide `model-provider` (`openai`, `anthropic`, or `fireworks`), `model`, and `
 
 ### Exit codes and findings
 
-The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configuration, `3` execution failure, `4` network/auth. Set `fail-on-findings: false` to keep findings in outputs while exiting `0` (useful when a later step posts a report). With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
+The action records the CLI exit code and outcome in its outputs. By default, CLI exit `1` (findings) becomes a successful step after the review is posted; exits `2`–`4` still fail. Set `fail-on-findings: true` only when findings should block the check. With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
 
 ### Run inputs
 
@@ -264,7 +267,10 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 | `path` | no | `.` | Source directory to review. |
 | `base` | no | — | Git base ref for change detection. |
 | `head` | no | — | Git head ref for change detection. |
-| `all-files` | no | `false` | Scan the entire target instead of a change. |
+| `all-files` | no | `false` | Opt into a full-repository scan instead of the inferred PR or branch diff. |
+| `github-review` | no | `auto` | `auto`, `true`, or `false`; auto posts on pull-request events. |
+| `github-submit` | no | `true` | Submit the GitHub review as an informational comment instead of leaving it pending. |
+| `github-token` | no | `github.token` | Token used to post the GitHub review. |
 | `builder` | no | `local` | `local` or `docker` builder for local adversaries. |
 | `build` | no | `false` | Build a local adversary before running. |
 | `force` | no | `false` | Run even when file triggers do not match. |
@@ -283,7 +289,7 @@ The step preserves CLI exit codes: `0` success, `1` findings, `2` usage/configur
 | `openai-base-url` | no | — | OpenAI-compatible base URL override. |
 | `anthropic-base-url` | no | — | Anthropic-compatible base URL override. |
 | `fireworks-base-url` | no | — | Fireworks-compatible base URL override. |
-| `fail-on-findings` | no | `true` | Fail the step when the review reports findings. |
+| `fail-on-findings` | no | `false` | Fail the step when the review reports findings. |
 | `api-url` | no | hosted API | API endpoint used for login. |
 | `profile` | no | ephemeral `run-action-<id>` for token/OAuth; CLI default otherwise | For `existing`, the CLI profile to use (never logged out). For token/OAuth, used only as a name prefix for a unique action-owned profile that is removed after the step. |
 | `auth-mode` | no | `none` | `none`, `oidc`, `token`, `oauth`, or `existing`. |
