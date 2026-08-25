@@ -31,6 +31,10 @@ inputs:
     description: Submit the GitHub review as an informational comment instead of leaving it pending (true or false).
     required: false
     default: "true"
+  include-summary:
+    description: Include the aggregate assessment and opinion in the GitHub review body (true or false). Inline and body-only findings are still posted when false.
+    required: false
+    default: "true"
   github-token:
     description: GitHub token used to post the pull-request review. Defaults to github.token.
     required: false
@@ -161,6 +165,7 @@ runs:
         INPUT_ALL_FILES: ${{ inputs.all-files }}
         INPUT_GITHUB_REVIEW: ${{ inputs.github-review }}
         INPUT_GITHUB_SUBMIT: ${{ inputs.github-submit }}
+        INPUT_INCLUDE_SUMMARY: ${{ inputs.include-summary }}
         INPUT_BUILDER: ${{ inputs.builder }}
         INPUT_BUILD: ${{ inputs.build }}
         INPUT_FORCE: ${{ inputs.force }}
