@@ -5,6 +5,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Keep action auto-detection deterministic even when this test itself runs on a PR.
+unset GITHUB_EVENT_NAME GITHUB_REF GITHUB_REPOSITORY GITHUB_TOKEN
+
 bash -n "$root/run/scripts/install.sh"
 bash -n "$root/run/scripts/run.sh"
 grep -Fq 'name: Run Adversary' "$root/run/action.yml"
@@ -22,6 +25,12 @@ grep -Fq 'model-api-key:' "$root/run/action.yml"
 grep -Fq 'auth-mode:' "$root/run/action.yml"
 grep -Fq 'token:' "$root/run/action.yml"
 grep -Fq 'fail-on-findings:' "$root/run/action.yml"
+github_review_input="$(sed -n '/^  github-review:/,/^  github-submit:/p' "$root/run/action.yml")"
+grep -Fq 'default: auto' <<<"$github_review_input"
+github_submit_input="$(sed -n '/^  github-submit:/,/^  github-token:/p' "$root/run/action.yml")"
+grep -Fq 'default: "true"' <<<"$github_submit_input"
+fail_on_findings_input="$(sed -n '/^  fail-on-findings:/,/^  api-url:/p' "$root/run/action.yml")"
+grep -Fq 'default: "false"' <<<"$fail_on_findings_input"
 path_input="$(sed -n '/^  path:/,/^  base:/p' "$root/run/action.yml")"
 grep -Fq 'default: .' <<<"$path_input"
 auth_input="$(sed -n '/^  auth-mode:/,/^  token:/p' "$root/run/action.yml")"
@@ -173,6 +182,21 @@ if grep -Fq -- '--builder' "$auto_log"; then
   exit 1
 fi
 
+pr_log="$tmp/pr.log"
+pr_output="$tmp/pr-output"
+: >"$pr_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$pr_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$pr_output" \
+  GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/42/merge \
+  GITHUB_REPOSITORY=adversarylabs/actions GITHUB_TOKEN=github-do-not-print \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+
+grep -Fq 'run profile=default args=--path . --format text --github-review --github-submit' "$pr_log"
+if grep -Fq 'github-do-not-print' "$pr_log" "$pr_output"; then
+  echo "GitHub token leaked into run action output" >&2
+  exit 1
+fi
+
 model_log="$tmp/model.log"
 model_output="$tmp/model-output"
 : >"$model_log"
@@ -303,12 +327,19 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$findings_log" RUN_EXIT=1 RUNNER_TEMP="$runner"
   INPUT_INCLUDE_SUPPRESSED=false INPUT_SHELL=false INPUT_ALLOW_UNSAFE_HOST_EXECUTION=false \
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
-  INPUT_FAIL_ON_FINDINGS=false INPUT_API_URL=https://api.example INPUT_PROFILE='' \
+  INPUT_API_URL=https://api.example INPUT_PROFILE='' \
   INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 grep -Fq 'exit-code=1' "$soft_output"
 grep -Fq 'outcome=findings' "$soft_output"
+
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_GITHUB_REVIEW=invalid \
+  bash "$root/run/scripts/run.sh" >/dev/null 2>&1; then
+  echo "run accepted an invalid github-review mode" >&2
+  exit 1
+fi
 
 blank_auto_log="$tmp/blank-auto.log"
 blank_auto_output="$tmp/blank-auto-output"
