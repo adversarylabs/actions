@@ -29,6 +29,8 @@ github_review_input="$(sed -n '/^  github-review:/,/^  github-submit:/p' "$root/
 grep -Fq 'default: auto' <<<"$github_review_input"
 github_submit_input="$(sed -n '/^  github-submit:/,/^  github-token:/p' "$root/run/action.yml")"
 grep -Fq 'default: "true"' <<<"$github_submit_input"
+include_summary_input="$(sed -n '/^  include-summary:/,/^  github-token:/p' "$root/run/action.yml")"
+grep -Fq 'default: "true"' <<<"$include_summary_input"
 fail_on_findings_input="$(sed -n '/^  fail-on-findings:/,/^  api-url:/p' "$root/run/action.yml")"
 grep -Fq 'default: "false"' <<<"$fail_on_findings_input"
 path_input="$(sed -n '/^  path:/,/^  base:/p' "$root/run/action.yml")"
@@ -188,10 +190,10 @@ pr_output="$tmp/pr-output"
 PATH="$fake_bin:$PATH" FAKE_LOG="$pr_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$pr_output" \
   GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/42/merge \
   GITHUB_REPOSITORY=adversarylabs/actions GITHUB_TOKEN=github-do-not-print \
-  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_INCLUDE_SUMMARY=false \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
-grep -Fq 'run profile=default args=--path . --format text --github-review --github-submit' "$pr_log"
+grep -Fq 'run profile=default args=--path . --format text --github-review --github-submit --github-include-summary=false' "$pr_log"
 if grep -Fq 'github-do-not-print' "$pr_log" "$pr_output"; then
   echo "GitHub token leaked into run action output" >&2
   exit 1
