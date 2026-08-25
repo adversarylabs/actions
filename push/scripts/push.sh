@@ -151,11 +151,18 @@ for key in ("canonicalReference", "digest", "manifestDigest"):
     if not isinstance(value, str) or not value:
         raise SystemExit(f"adversary push did not return {key}")
     print(value)
+for key in ("namespaceSignatureDigest", "namespaceTrustDigest"):
+    value = data.get(key, "")
+    if not isinstance(value, str):
+        raise SystemExit(f"adversary push returned invalid {key}")
+    print(value)
 PY
 reference="$(sed -n '1p' "$push_values")"
 digest="$(sed -n '2p' "$push_values")"
 manifest_digest="$(sed -n '3p' "$push_values")"
-if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$push_values" | tr -d ' ')" != 3 ]]; then
+namespace_signature_digest="$(sed -n '4p' "$push_values")"
+namespace_trust_digest="$(sed -n '5p' "$push_values")"
+if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$push_values" | tr -d ' ')" != 5 ]]; then
   echo "adversary push returned incomplete metadata" >&2
   exit 3
 fi
@@ -203,8 +210,11 @@ fi
   printf 'digest=%s\n' "$digest"
   printf 'manifest-digest=%s\n' "$manifest_digest"
   printf 'latest-reference=%s\n' "$latest_reference"
+  printf 'namespace-signature-digest=%s\n' "$namespace_signature_digest"
+  printf 'namespace-trust-digest=%s\n' "$namespace_trust_digest"
 } >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
 printf 'Pushed %s\n' "$reference"
 printf 'Digest: %s\n' "$digest"
 if [[ -n "$latest_reference" ]]; then printf 'Also pushed %s\n' "$latest_reference"; fi
+if [[ -n "$namespace_signature_digest" ]]; then printf 'Namespace signature: %s\n' "$namespace_signature_digest"; fi

@@ -71,6 +71,12 @@ outputs:
   latest-reference:
     description: Pushed latest reference when push-latest is enabled.
     value: ${{ steps.push.outputs.latest-reference }}
+  namespace-signature-digest:
+    description: Platform-issued namespace signature referrer digest for an Adversary Labs private registry publish; empty for external or public repositories.
+    value: ${{ steps.push.outputs.namespace-signature-digest }}
+  namespace-trust-digest:
+    description: Platform-endorsed namespace trust referrer digest for an Adversary Labs private registry publish; empty for external or public repositories.
+    value: ${{ steps.push.outputs.namespace-trust-digest }}
 
 runs:
   using: composite

@@ -123,7 +123,7 @@ case "$command" in
   pack) printf '%s\n' '{"schemaVersion":2,"command":"pack","data":{"canonicalReference":"example:1.0.0"}}' ;;
   push)
     reference="$2"
-    printf '{"schemaVersion":1,"command":"push","data":{"canonicalReference":"%s","digest":"sha256:image","manifestDigest":"sha256:manifest"}}\n' "$reference"
+    printf '{"schemaVersion":1,"command":"push","data":{"canonicalReference":"%s","digest":"sha256:image","manifestDigest":"sha256:manifest","namespaceSignatureDigest":"sha256:namespace-signature","namespaceTrustDigest":"sha256:namespace-trust"}}\n' "$reference"
     ;;
   *) echo "unexpected command: $command" >&2; exit 9 ;;
 esac
@@ -178,6 +178,8 @@ grep -Eq 'logout profile=release-[0-9]+-[0-9]+ args=--local-only' "$log"
 grep -Fq 'reference=registry.example/team/example:1.0.0' "$push_output"
 grep -Fq 'digest=sha256:image' "$push_output"
 grep -Fq 'manifest-digest=sha256:manifest' "$push_output"
+grep -Fq 'namespace-signature-digest=sha256:namespace-signature' "$push_output"
+grep -Fq 'namespace-trust-digest=sha256:namespace-trust' "$push_output"
 if grep -Fq 'adv_sa_do-not-print-me' "$log" "$tmp/push-stdout" "$package_output" "$push_output"; then
   echo "service account token leaked into action output" >&2
   exit 1
