@@ -11,6 +11,7 @@ require_bool() {
 
 adversaries_raw="${INPUT_ADVERSARIES:-auto}"
 path="${INPUT_PATH:-.}"
+data_dir="${INPUT_DATA_DIR:-${ADVERSARY_DATA_DIR:-}}"
 base="${INPUT_BASE:-}"
 head="${INPUT_HEAD:-}"
 all_files="${INPUT_ALL_FILES:-false}"
@@ -42,6 +43,16 @@ auth_mode="${INPUT_AUTH_MODE:-none}"
 token="${INPUT_TOKEN:-}"
 client_name="${INPUT_CLIENT_NAME:-Adversary run action}"
 unset INPUT_TOKEN INPUT_MODEL_API_KEY
+
+if [[ -z "$data_dir" ]]; then
+  data_dir="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-data"
+fi
+case "$data_dir" in
+  /*) ;;
+  *) echo "data-dir must be an absolute path" >&2; exit 2 ;;
+esac
+mkdir -p -- "$data_dir"
+export ADVERSARY_DATA_DIR="$data_dir"
 
 adversaries=()
 auto_select=false
