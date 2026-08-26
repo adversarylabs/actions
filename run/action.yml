@@ -13,6 +13,9 @@ inputs:
     description: Path to the source directory to review, relative to the workspace.
     required: false
     default: .
+  data-dir:
+    description: Absolute directory for cached adversary artifacts. Defaults to RUNNER_TEMP/adversary-data. Credentials are stored separately.
+    required: false
   base:
     description: Git base ref for change detection (defaults to the detected default branch when head is set).
     required: false
@@ -160,6 +163,7 @@ runs:
       env:
         INPUT_ADVERSARIES: ${{ inputs.adversaries }}
         INPUT_PATH: ${{ inputs.path }}
+        INPUT_DATA_DIR: ${{ inputs.data-dir }}
         INPUT_BASE: ${{ inputs.base }}
         INPUT_HEAD: ${{ inputs.head }}
         INPUT_ALL_FILES: ${{ inputs.all-files }}

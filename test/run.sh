@@ -6,13 +6,15 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 # Keep action auto-detection deterministic even when this test itself runs on a PR.
-unset GITHUB_EVENT_NAME GITHUB_REF GITHUB_REPOSITORY GITHUB_TOKEN
+unset GITHUB_EVENT_NAME GITHUB_REF GITHUB_REPOSITORY GITHUB_TOKEN ADVERSARY_DATA_DIR
 
 bash -n "$root/run/scripts/install.sh"
 bash -n "$root/run/scripts/run.sh"
 grep -Fq 'name: Run Adversary' "$root/run/action.yml"
 grep -Fq 'using: composite' "$root/run/action.yml"
 grep -Fq 'adversaries:' "$root/run/action.yml"
+grep -Fq 'data-dir:' "$root/run/action.yml"
+grep -Fq 'INPUT_DATA_DIR: ${{ inputs.data-dir }}' "$root/run/action.yml"
 adversaries_input="$(sed -n '/^  adversaries:/,/^  cli-version:/p' "$root/run/action.yml")"
 grep -Fq 'required: false' <<<"$adversaries_input"
 grep -Fq 'default: auto' <<<"$adversaries_input"
@@ -92,6 +94,7 @@ fi
 printf '%s profile=%s args=%s\n' "$command" "$profile" "$*" >>"$FAKE_LOG"
 printf 'env OPENAI_API_KEY=%s ANTHROPIC_API_KEY=%s FIREWORKS_API_KEY=%s ADVERSARY_MODEL_PROVIDER=%s\n' \
   "${OPENAI_API_KEY:-}" "${ANTHROPIC_API_KEY:-}" "${FIREWORKS_API_KEY:-}" "${ADVERSARY_MODEL_PROVIDER:-}" >>"$FAKE_LOG"
+printf 'env ADVERSARY_DATA_DIR=%s\n' "${ADVERSARY_DATA_DIR:-}" >>"$FAKE_LOG"
 case "$command" in
   login)
     if [[ "$*" == '--token-stdin --registry-namespace adversarylabs' ]]; then
@@ -150,6 +153,10 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
 grep -Eq 'login profile=run-action-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$log"
 grep -Eq 'run profile=run-action-[0-9]+-[0-9]+ args=adversarylabs/dockerfile --path src --builder local --format text' "$log"
 grep -Eq 'logout profile=run-action-[0-9]+-[0-9]+ args=--local-only' "$log"
+default_data_dir="$runner/adversary-data"
+[[ -d "$default_data_dir" ]]
+grep -Fq "env ADVERSARY_DATA_DIR=$default_data_dir" "$log"
+printf 'preserved\n' >"$default_data_dir/cache-marker"
 # Ephemeral profiles must not log out a bare caller-owned name.
 if grep -Eq 'logout profile=run-action args=' "$log"; then
   echo "run action logged out a non-ephemeral profile name" >&2
@@ -179,8 +186,37 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$auto_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT=
 
 grep -Fq 'run profile=default args=--path . --format text --base main --head HEAD' "$auto_log"
 grep -Fq 'exit-code=0' "$auto_output"
+[[ "$(cat "$default_data_dir/cache-marker")" == preserved ]]
+grep -Fq "env ADVERSARY_DATA_DIR=$default_data_dir" "$auto_log"
 if grep -Fq -- '--builder' "$auto_log"; then
   echo "automatic selection passed an explicit-only builder flag" >&2
+  exit 1
+fi
+
+custom_data_dir="$tmp/custom-adversary-data"
+custom_data_log="$tmp/custom-data.log"
+custom_data_output="$tmp/custom-data-output"
+: >"$custom_data_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$custom_data_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$custom_data_output" \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_DATA_DIR="$custom_data_dir" INPUT_AUTH_MODE=none \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+[[ -d "$custom_data_dir" ]]
+grep -Fq "env ADVERSARY_DATA_DIR=$custom_data_dir" "$custom_data_log"
+
+environment_data_dir="$tmp/environment-adversary-data"
+environment_data_log="$tmp/environment-data.log"
+environment_data_output="$tmp/environment-data-output"
+: >"$environment_data_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$environment_data_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$environment_data_output" \
+  ADVERSARY_DATA_DIR="$environment_data_dir" INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+[[ -d "$environment_data_dir" ]]
+grep -Fq "env ADVERSARY_DATA_DIR=$environment_data_dir" "$environment_data_log"
+
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_DATA_DIR=relative/cache INPUT_AUTH_MODE=none \
+  bash "$root/run/scripts/run.sh" >/dev/null 2>&1; then
+  echo "run accepted a relative data-dir" >&2
   exit 1
 fi
 

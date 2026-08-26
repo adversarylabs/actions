@@ -210,6 +210,32 @@ jobs:
 
 When `cli-version` is omitted, the action installs the latest stable Adversary CLI release (same resolution rules as push). Pin `cli-version` and the action ref for reproducible CI. `path` defaults to `.`.
 
+### Artifact cache
+
+The action stores pulled adversaries in a content-addressed repository under `data-dir`. It still checks the remote catalog and resolves each OCI reference on every run; when the resolved digest is already present, the CLI reuses the local artifact without downloading its layers and verifies it before execution. `data-dir` defaults to `${RUNNER_TEMP}/adversary-data`, and an existing `ADVERSARY_DATA_DIR` environment value remains supported when the input is omitted.
+
+Cache only this artifact directory. Adversary Labs credentials use the operating system's separate configuration directory and are not written beneath `data-dir`. The artifact cache does contain the complete contents of private adversaries, so scope access to jobs that are authorized to pull those packages.
+
+Depot CI can persist the directory with a durable cache disk. Use a repository-specific disk name unless cross-repository sharing is intentional:
+
+```yaml
+- name: Mount adversary cache
+  uses: depot/cache-mount@v1
+  with:
+    name: adversary-${{ github.event.repository.id }}-v1
+    path: /mnt/adversary
+
+- name: Run adversaries
+  uses: adversarylabs/actions/run@v1
+  with:
+    data-dir: /mnt/adversary
+    adversaries: auto
+    auth-mode: oidc
+    registry-namespace: your-team-slug
+```
+
+Other CI cache implementations can restore and save `${{ runner.temp }}/adversary-data` while using the action's default, or mount a different absolute path and pass it through `data-dir`. Include `v1` in the cache key so a future incompatible repository format can move to a fresh cache.
+
 Automatic selection is the default. These are equivalent:
 
 ```yaml
@@ -265,6 +291,7 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 | `adversaries` | no | `auto` | `auto` to pull and select matching accessible adversaries, or one or more explicit refs (whitespace or newlines). |
 | `cli-version` | no | latest stable release | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Source directory to review. |
+| `data-dir` | no | `${RUNNER_TEMP}/adversary-data` | Absolute directory containing cacheable adversary artifacts. `ADVERSARY_DATA_DIR` is used as a fallback when set. |
 | `base` | no | — | Git base ref for change detection. |
 | `head` | no | — | Git head ref for change detection. |
 | `all-files` | no | `false` | Opt into a full-repository scan instead of the inferred PR or branch diff. |
@@ -314,6 +341,7 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 - **Run**: read-only review of the checked-out tree. Prefer a pull-scoped service-account token (or `auth-mode: none` for public/local adversaries). Do not reuse push credentials in ordinary review jobs.
 - The CLI archive is checksum-verified before execution. Pin `cli-version` in the caller workflow when exact toolchain reproducibility is required.
 - OIDC credentials expire after ten minutes. OIDC and service-account tokens are passed through standard input, removed from the environment before `run`/`push`, and temporary CLI profiles are removed afterward.
+- The run action's `data-dir` contains package payloads and trust metadata, never credentials. Treat caches containing private adversaries as private data and scope them accordingly.
 - Model API keys are passed only through environment variables (never CLI flags) and are unset from action input env before the CLI is invoked.
 - Neither action requires write permission for the caller repository. Registry authority comes only from the supplied credential flow.
 
