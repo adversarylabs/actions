@@ -71,8 +71,10 @@ await mkdir("dist", { recursive: true })
 await copyFile("src/index.ts", "dist/index.js")
 EOF
 cp "$seed/src/index.ts" "$seed/dist/index.js"
+printf 'dist/\n' >"$seed/.gitignore"
 
-git -C "$seed" add adversary.yaml package.json package-lock.json src/index.ts dist/index.js build.mjs
+git -C "$seed" add .gitignore adversary.yaml package.json package-lock.json src/index.ts build.mjs
+git -C "$seed" add -f dist/index.js
 git -C "$seed" commit -m initial >/dev/null
 initial_sha="$(git -C "$seed" rev-parse HEAD)"
 git -C "$seed" remote add origin "$remote"
