@@ -92,7 +92,10 @@ if [[ "$tag_sha" == "$branch_sha" ]]; then
   if git diff --quiet -- "${version_files[@]}"; then
     echo "Release metadata is already at ${version}; no bump commit is needed."
   else
-    git add "${version_files[@]}"
+    # Release metadata and runtime artifacts come from the tagged tree. Use
+    # update semantics so a tracked artifact remains stageable when its parent
+    # directory is intentionally ignored (for example dist/index.js).
+    git add -u -- "${version_files[@]}"
     git -c user.name=adversarylabs-release \
       -c user.email=adversarylabs-release@users.noreply.github.com \
       commit -m "$message"
