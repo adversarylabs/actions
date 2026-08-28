@@ -19,7 +19,7 @@ git -C "$seed" config user.name test
 git -C "$seed" config user.email test@example.com
 
 cat >"$seed/adversary.yaml" <<'EOF'
-name: depotci
+name: adversarylabs/ci/depot
 version: 0.0.1
 description: Test adversary.
 runtime:
@@ -91,7 +91,7 @@ INPUT_TAG=v0.0.2 INPUT_PATH=. INPUT_BRANCH=main INPUT_TOKEN=github-do-not-print-
   GITHUB_SHA="$initial_sha" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$first_output" \
   bash "$root/version/scripts/version.sh" >"$first_log" 2>&1
 
-grep -Fq 'name=depotci' "$first_output"
+grep -Fq 'name=adversarylabs/ci/depot' "$first_output"
 grep -Fq 'version=0.0.2' "$first_output"
 grep -Fq 'changed=true' "$first_output"
 bump_sha="$(sed -n 's/^commit=//p' "$first_output")"
@@ -130,7 +130,7 @@ INPUT_TAG=v0.0.2 INPUT_PATH=. INPUT_BRANCH=main INPUT_TOKEN=github-do-not-print-
   GITHUB_SHA="$initial_sha" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$rerun_output" \
   bash "$root/version/scripts/version.sh" >/dev/null
 
-grep -Fq 'name=depotci' "$rerun_output"
+grep -Fq 'name=adversarylabs/ci/depot' "$rerun_output"
 grep -Fq 'version=0.0.2' "$rerun_output"
 grep -Fq 'changed=false' "$rerun_output"
 grep -Fq "commit=$bump_sha" "$rerun_output"
