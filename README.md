@@ -132,7 +132,7 @@ Set `auth-mode: existing` to skip login. This supports a runner with a preconfig
     remote-reference: ghcr.io/acme/dockerfile:0.1.0
 ```
 
-For hosted pushes, `repository-name` overrides the remote name independently of the name in `adversary.yaml`. The action combines `registry-host` (default `registry.adversarylabs.ai`), `registry-namespace`, the repository name, and the packaged manifest version. Set `push-latest: true` to push the same digest under `latest` as well. Use `remote-reference` instead when the complete versioned destination must be supplied explicitly; it cannot be combined with `repository-name`.
+For hosted pushes, `repository-name` overrides the remote name independently of the name in `adversary.yaml`. It may be nested, such as `go/security`, and is always rooted under the authenticated team namespace (`adversarylabs/go/security`). A value already rooted at that same namespace is not duplicated. `library/*` is reserved for server-side official and partner promotion. The action combines `registry-host` (default `registry.adversarylabs.ai`), `registry-namespace`, the repository name, and the packaged manifest version. Set `push-latest: true` to push the same digest under `latest` as well. Use `remote-reference` instead when the complete versioned destination must be supplied explicitly; it cannot be combined with `repository-name`.
 
 ### Inputs
 

@@ -36,9 +36,10 @@ const scalar = (line, key) => {
 }
 
 const name = scalar(names[0], "name")
-// Single-segment (legacy) or domain/name catalog ids (e.g. go/security).
+// OCI repository paths may contain any number of segments. Hosted releases use
+// team/taxonomy/name (for example adversarylabs/go/security).
 if (
-  !/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/.test(
+  !/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/.test(
     name,
   )
 ) {

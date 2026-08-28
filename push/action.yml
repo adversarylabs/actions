@@ -24,7 +24,7 @@ inputs:
     description: Optional fully qualified destination. When omitted, the authenticated Adversary Labs namespace is used.
     required: false
   repository-name:
-    description: Optional remote repository name within registry-namespace. The packaged version is used as its tag. Cannot be combined with remote-reference.
+    description: Optional nested repository path within registry-namespace. The packaged version is used as its tag. library/* is reserved for admin promotion. Cannot be combined with remote-reference.
     required: false
   push-latest:
     description: Also push the packaged artifact with the latest tag (true or false).

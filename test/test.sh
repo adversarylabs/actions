@@ -218,6 +218,25 @@ grep -Eq 'push profile=release-[0-9]+-[0-9]+ args=registry.adversarylabs.ai/libr
 grep -Fq 'reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:0.0.3' "$named_output"
 grep -Fq 'latest-reference=registry.adversarylabs.ai/adversarylabs/depotci-adversary:latest' "$named_output"
 
+nested_log="$tmp/nested.log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$nested_log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
+  RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_PROFILE=release INPUT_API_URL=https://api.example \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='GitHub Actions' \
+  INPUT_REMOTE_REFERENCE='' INPUT_REPOSITORY_NAME=go/security INPUT_PUSH_LATEST=false \
+  INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash "$root/push/scripts/push.sh" >/dev/null
+grep -Eq 'push profile=release-[0-9]+-[0-9]+ args=example:1.0.0 registry.adversarylabs.ai/adversarylabs/go/security:1.0.0 --format json' "$nested_log"
+
+if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
+  INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=existing INPUT_TOKEN='' \
+  INPUT_REMOTE_REFERENCE='' INPUT_REPOSITORY_NAME=library/go/security \
+  INPUT_PUSH_LATEST=false INPUT_REGISTRY_NAMESPACE=adversarylabs \
+  bash "$root/push/scripts/push.sh" >/dev/null 2>&1; then
+  echo "push accepted the reserved library namespace" >&2
+  exit 1
+fi
+
 if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$named_output" \
   INPUT_LOCAL_REFERENCE=example:1.0.0 INPUT_AUTH_MODE=existing INPUT_TOKEN='' \
   INPUT_REMOTE_REFERENCE=registry.example/team/example:1.0.0 INPUT_REPOSITORY_NAME=example \

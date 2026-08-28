@@ -39,9 +39,14 @@ if [[ -n "$repository_name" ]]; then
     echo "registry-namespace is required with repository-name" >&2
     exit 2
   fi
-  # Single-segment repo name, or domain/name catalog path (e.g. go/security).
-  if [[ ! "$repository_name" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)?$ ]]; then
+  # A repository may be nested, but it is always rooted under the authenticated
+  # team namespace. library/* is reserved for server-side catalog promotion.
+  if [[ ! "$repository_name" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$ ]]; then
     echo "repository-name must be a lowercase OCI repository path without a registry host or tag" >&2
+    exit 2
+  fi
+  if [[ "$repository_name" == library || "$repository_name" == library/* ]]; then
+    echo "the library namespace is reserved for catalog promotion" >&2
     exit 2
   fi
   registry_host="${INPUT_REGISTRY_HOST:-registry.adversarylabs.ai}"
@@ -62,9 +67,9 @@ if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", tag):
 print(tag)
 PY
   )"
-  # When repository-name already includes a domain path (go/security), do not
-  # nest it under registry-namespace (which would produce adversarylabs/go/security).
-  if [[ "$repository_name" == */* ]]; then
+  # Accept either a path relative to the authenticated namespace (go/security)
+  # or the complete team-owned path (adversarylabs/go/security).
+  if [[ "$repository_name" == "${INPUT_REGISTRY_NAMESPACE}/"* ]]; then
     remote_reference="${registry_host}/${repository_name}:${local_tag}"
   else
     remote_reference="${registry_host}/${INPUT_REGISTRY_NAMESPACE}/${repository_name}:${local_tag}"
