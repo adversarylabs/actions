@@ -155,6 +155,9 @@ runs:
       shell: bash
       env:
         INPUT_CLI_VERSION: ${{ inputs.cli-version }}
+        # Authenticate the release lookup/download to avoid unauthenticated
+        # api.github.com 403 rate-limiting on hosted runners.
+        GITHUB_TOKEN: ${{ inputs.github-token || github.token }}
       run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
 
     - name: Authenticate and run

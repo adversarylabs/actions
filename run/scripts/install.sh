@@ -7,6 +7,13 @@ download() {
   if [[ "$source" == https://* ]]; then
     args+=(--proto '=https' --proto-redir '=https')
   fi
+  # Authenticate GitHub requests when a token is available. Unauthenticated
+  # calls to api.github.com share a low per-IP rate limit and intermittently
+  # return HTTP 403 on hosted runners, which fails the latest-release lookup.
+  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  if [[ -n "$token" && ( "$source" == https://api.github.com/* || "$source" == https://github.com/* ) ]]; then
+    args+=(--header "Authorization: Bearer ${token}")
+  fi
   curl "${args[@]}" "$source" --output "$output"
 }
 
