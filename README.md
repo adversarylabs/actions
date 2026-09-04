@@ -110,7 +110,7 @@ jobs:
         run: echo "Pushed ${{ steps.push.outputs.reference }} at ${{ steps.push.outputs.digest }}"
 ```
 
-When `cli-version` is omitted, the action queries GitHub's latest-release endpoint and installs the latest stable Adversary CLI release. GitHub excludes drafts and prereleases from that endpoint. Until a stable release exists, set `cli-version` to an exact prerelease such as `2026.7.17-beta.3`. Pin `cli-version` when reproducible toolchain selection is more important than automatically tracking stable releases, and pin the action itself to an exact release tag or full commit SHA.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.4-beta.2`. Set `cli-version` explicitly to test a different release. Pin the action itself to an exact release tag or full commit SHA for reproducible CI.
 
 The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`; configure the matching Node runtime before invoking the action. pnpm and Yarn installs require Corepack, which is not bundled with Node.js 25 and later; install Corepack separately on those runtimes. For reproducible pnpm or Yarn installs, pin the exact tool version in the `packageManager` field of `package.json`.
 
@@ -138,7 +138,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `cli-version` | no | latest stable release | Exact Adversary CLI release tag. Pin this input to use a prerelease. |
+| `cli-version` | no | `2026.9.4-beta.2` | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Adversary project directory. |
 | `builder` | no | `local` | `local` or `docker` package builder. |
 | `install-dependencies` | no | `true` | Install dependencies from a supported lockfile before local packaging. Set to `false` when already installed; ignored by the Docker builder. |
@@ -208,7 +208,7 @@ jobs:
           echo "findings=${{ steps.review.outputs.findings-count }}"
 ```
 
-When `cli-version` is omitted, the action installs the latest stable Adversary CLI release (same resolution rules as push). Pin `cli-version` and the action ref for reproducible CI. `path` defaults to `.`.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.4-beta.2`. Set `cli-version` explicitly to test a different release, and pin the action ref for reproducible CI. `path` defaults to `.`.
 
 ### Artifact cache
 
@@ -289,7 +289,7 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
 | `adversaries` | no | `auto` | `auto` to pull and select matching accessible adversaries, or one or more explicit refs (whitespace or newlines). |
-| `cli-version` | no | latest stable release | Exact Adversary CLI release tag. |
+| `cli-version` | no | `2026.9.4-beta.2` | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Source directory to review. |
 | `data-dir` | no | `${RUNNER_TEMP}/adversary-data` | Absolute directory containing cacheable adversary artifacts. `ADVERSARY_DATA_DIR` is used as a fallback when set. |
 | `base` | no | — | Git base ref for change detection. |
