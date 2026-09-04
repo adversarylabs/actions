@@ -36,6 +36,7 @@ model_api_key="${INPUT_MODEL_API_KEY:-}"
 openai_base_url="${INPUT_OPENAI_BASE_URL:-}"
 anthropic_base_url="${INPUT_ANTHROPIC_BASE_URL:-}"
 fireworks_base_url="${INPUT_FIREWORKS_BASE_URL:-}"
+camel_base_url="${INPUT_CAMEL_BASE_URL:-}"
 fail_on_findings="${INPUT_FAIL_ON_FINDINGS:-false}"
 api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
 profile="${INPUT_PROFILE:-}"
@@ -151,8 +152,8 @@ fi
 model_provider="$(printf '%s' "$model_provider" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 model="$(printf '%s' "$model" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 case "$model_provider" in
-  ""|openai|anthropic|fireworks) ;;
-  *) echo "model-provider must be openai, anthropic, or fireworks" >&2; exit 2 ;;
+  ""|openai|anthropic|fireworks|camel|camel-stream) ;;
+  *) echo "model-provider must be openai, anthropic, fireworks, or camel" >&2; exit 2 ;;
 esac
 if [[ -n "$model_api_key" && -z "$model_provider" ]]; then
   echo "model-provider is required when model-api-key is set" >&2
@@ -163,12 +164,14 @@ if [[ -n "$model_api_key" ]]; then
     openai) export OPENAI_API_KEY="$model_api_key" ;;
     anthropic) export ANTHROPIC_API_KEY="$model_api_key" ;;
     fireworks) export FIREWORKS_API_KEY="$model_api_key" ;;
+    camel|camel-stream) export CAMEL_API_KEY="$model_api_key" ;;
   esac
   model_api_key=''
 fi
 if [[ -n "$openai_base_url" ]]; then export ADVERSARY_OPENAI_BASE_URL="$openai_base_url"; fi
 if [[ -n "$anthropic_base_url" ]]; then export ADVERSARY_ANTHROPIC_BASE_URL="$anthropic_base_url"; fi
 if [[ -n "$fireworks_base_url" ]]; then export ADVERSARY_FIREWORKS_BASE_URL="$fireworks_base_url"; fi
+if [[ -n "$camel_base_url" ]]; then export ADVERSARY_CAMEL_BASE_URL="$camel_base_url"; fi
 
 # Token/OAuth always use an ephemeral action-owned profile so cleanup cannot
 # remove a caller-owned profile that happens to share a name.

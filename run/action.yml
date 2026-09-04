@@ -89,13 +89,13 @@ inputs:
     description: Maximum explicit local build time as a Go duration (for example 10m).
     required: false
   model-provider:
-    description: Model provider for model-backed adversaries (openai, anthropic, or fireworks). Overrides ADVERSARY_MODEL_PROVIDER.
+    description: Model provider for model-backed adversaries (openai, anthropic, fireworks, or camel). Overrides ADVERSARY_MODEL_PROVIDER.
     required: false
   model:
     description: Provider model identifier for model-backed adversaries. Overrides ADVERSARY_MODEL.
     required: false
   model-api-key:
-    description: Provider API key for model-backed adversaries. Mapped to OPENAI_API_KEY, ANTHROPIC_API_KEY, or FIREWORKS_API_KEY based on model-provider. Prefer a Depot CI or GitHub Actions secret.
+    description: Provider API key for model-backed adversaries. Mapped to OPENAI_API_KEY, ANTHROPIC_API_KEY, FIREWORKS_API_KEY, or CAMEL_API_KEY based on model-provider. Prefer a Depot CI or GitHub Actions secret.
     required: false
   openai-base-url:
     description: Optional OpenAI-compatible base URL override (ADVERSARY_OPENAI_BASE_URL).
@@ -105,6 +105,9 @@ inputs:
     required: false
   fireworks-base-url:
     description: Optional Fireworks-compatible base URL override (ADVERSARY_FIREWORKS_BASE_URL).
+    required: false
+  camel-base-url:
+    description: Optional Camel-compatible base URL override (ADVERSARY_CAMEL_BASE_URL).
     required: false
   fail-on-findings:
     description: Fail the step when the review reports findings (true or false). Defaults to false so findings are review feedback rather than infrastructure failures.
@@ -189,6 +192,7 @@ runs:
         INPUT_OPENAI_BASE_URL: ${{ inputs.openai-base-url }}
         INPUT_ANTHROPIC_BASE_URL: ${{ inputs.anthropic-base-url }}
         INPUT_FIREWORKS_BASE_URL: ${{ inputs.fireworks-base-url }}
+        INPUT_CAMEL_BASE_URL: ${{ inputs.camel-base-url }}
         INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
         INPUT_API_URL: ${{ inputs.api-url }}
         INPUT_PROFILE: ${{ inputs.profile }}

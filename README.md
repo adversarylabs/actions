@@ -278,7 +278,7 @@ Use `auth-mode: token` with a pull-scoped service-account token when OIDC is una
 
 ### Model-backed adversaries
 
-Provide `model-provider` (`openai`, `anthropic`, or `fireworks`), `model`, and `model-api-key` (a secret). The action maps the key to `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `FIREWORKS_API_KEY` and never places API keys on the CLI argument list. Optional `openai-base-url`, `anthropic-base-url`, and `fireworks-base-url` set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
+Provide `model-provider` (`openai`, `anthropic`, `fireworks`, or `camel`), `model`, and `model-api-key` (a secret). The action maps the key to `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `FIREWORKS_API_KEY`, or `CAMEL_API_KEY` and never places API keys on the CLI argument list. Optional `openai-base-url`, `anthropic-base-url`, `fireworks-base-url`, and `camel-base-url` set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
 
 ### Exit codes and findings
 
@@ -311,12 +311,13 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 | `allow-unsafe-host-execution` | no | `false` | Allow unrestricted HostExecutor for an unknown publisher. |
 | `timeout` | no | — | Max execution time (Go duration, for example `10m`). |
 | `build-timeout` | no | — | Max explicit local build time (Go duration). |
-| `model-provider` | no | — | `openai`, `anthropic`, or `fireworks`. |
+| `model-provider` | no | — | `openai`, `anthropic`, `fireworks`, or `camel`. |
 | `model` | no | — | Provider model identifier. |
 | `model-api-key` | no | — | Provider API key secret mapped from `model-provider`. |
 | `openai-base-url` | no | — | OpenAI-compatible base URL override. |
 | `anthropic-base-url` | no | — | Anthropic-compatible base URL override. |
 | `fireworks-base-url` | no | — | Fireworks-compatible base URL override. |
+| `camel-base-url` | no | — | Camel-compatible base URL override. |
 | `fail-on-findings` | no | `false` | Fail the step when the review reports findings. |
 | `api-url` | no | hosted API | API endpoint used for login. |
 | `profile` | no | ephemeral `run-action-<id>` for token/OAuth; CLI default otherwise | For `existing`, the CLI profile to use (never logged out). For token/OAuth, used only as a name prefix for a unique action-owned profile that is removed after the step. |
