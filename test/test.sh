@@ -13,7 +13,7 @@ grep -Fq 'using: composite' "$root/push/action.yml"
 grep -Fq 'cli-version:' "$root/push/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/push/action.yml")"
 grep -Fq 'required: false' <<<"$cli_version_input"
-grep -Fq 'default: 2026.9.4-beta.2' <<<"$cli_version_input"
+grep -Fq 'default: 2026.9.4-beta.3' <<<"$cli_version_input"
 if grep -Fq 'required: true' <<<"$cli_version_input"; then
   echo "cli-version is still required" >&2
   exit 1
