@@ -95,8 +95,8 @@ if [[ -n "${INPUT_MODEL_API_KEY:-}" ]]; then
   exit 88
 fi
 printf '%s profile=%s args=%s\n' "$command" "$profile" "$*" >>"$FAKE_LOG"
-printf 'env OPENAI_API_KEY=%s ANTHROPIC_API_KEY=%s FIREWORKS_API_KEY=%s ADVERSARY_MODEL_PROVIDER=%s\n' \
-  "${OPENAI_API_KEY:-}" "${ANTHROPIC_API_KEY:-}" "${FIREWORKS_API_KEY:-}" "${ADVERSARY_MODEL_PROVIDER:-}" >>"$FAKE_LOG"
+printf 'env OPENAI_API_KEY=%s ANTHROPIC_API_KEY=%s FIREWORKS_API_KEY=%s CAMEL_API_KEY=%s ADVERSARY_MODEL_PROVIDER=%s\n' \
+  "${OPENAI_API_KEY:-}" "${ANTHROPIC_API_KEY:-}" "${FIREWORKS_API_KEY:-}" "${CAMEL_API_KEY:-}" "${ADVERSARY_MODEL_PROVIDER:-}" >>"$FAKE_LOG"
 printf 'env ADVERSARY_DATA_DIR=%s\n' "${ADVERSARY_DATA_DIR:-}" >>"$FAKE_LOG"
 case "$command" in
   login)
@@ -267,6 +267,21 @@ if grep -Fq 'sk-do-not-print' "$model_output" "$tmp/model-stdout"; then
 fi
 if grep -Eq '^(login|logout) ' "$model_log"; then
   echo "none authentication unexpectedly changed CLI login state" >&2
+  exit 1
+fi
+
+camel_log="$tmp/camel.log"
+camel_output="$tmp/camel-output"
+: >"$camel_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$camel_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$camel_output" \
+  INPUT_ADVERSARIES='adversarylabs/go-cli' INPUT_PATH=. INPUT_FORMAT=json \
+  INPUT_MODEL_PROVIDER=camel INPUT_MODEL=auto INPUT_MODEL_API_KEY='qaml-do-not-print' \
+  INPUT_CAMEL_BASE_URL='https://stream.camel.example' INPUT_AUTH_MODE=none \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >"$tmp/camel-stdout"
+grep -Fq -- '--model-provider camel --model auto' "$camel_log"
+grep -Fq 'CAMEL_API_KEY=qaml-do-not-print' "$camel_log"
+if grep -Fq 'qaml-do-not-print' "$camel_output" "$tmp/camel-stdout"; then
+  echo "Camel API key leaked into action outputs" >&2
   exit 1
 fi
 
