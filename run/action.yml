@@ -7,8 +7,9 @@ inputs:
     required: false
     default: auto
   cli-version:
-    description: Exact Adversary CLI release tag to install. When omitted, use GitHub's latest stable release.
+    description: Exact Adversary CLI release tag to install.
     required: false
+    default: 2026.9.4-beta.2
   path:
     description: Path to the source directory to review, relative to the workspace.
     required: false
