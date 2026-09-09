@@ -194,8 +194,19 @@ cleanup_auth() {
 }
 credential_file=""
 trap cleanup_auth EXIT
-trap 'exit 143' TERM
-trap 'exit 130' INT
+review_pid=""
+cancel_review() {
+  local exit_code="$1"
+  # Finish shutdown before authentication cleanup, even if cancellation repeats.
+  trap '' TERM INT
+  if [[ -n "$review_pid" ]]; then
+    kill -TERM "$review_pid" 2>/dev/null || true
+    wait "$review_pid" 2>/dev/null || true
+  fi
+  exit "$exit_code"
+}
+trap 'cancel_review 143' TERM
+trap 'cancel_review 130' INT
 
 if [[ "$auth_mode" == oidc ]]; then
   credential_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-ci-token.XXXXXX")"
@@ -268,21 +279,23 @@ fi
 
 review_command=(python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/timeout.py" adversary)
 
-set +e
 if [[ -n "$profile" && "$auth_mode" != none ]]; then
-  if [[ -n "$run_stdout" ]]; then
-    "${review_command[@]}" --profile "$profile" "${run_args[@]}" >"$run_stdout"
-  else
-    "${review_command[@]}" --profile "$profile" "${run_args[@]}"
-  fi
-else
-  if [[ -n "$run_stdout" ]]; then
-    "${review_command[@]}" "${run_args[@]}" >"$run_stdout"
-  else
-    "${review_command[@]}" "${run_args[@]}"
-  fi
+  review_command+=(--profile "$profile")
 fi
+review_command+=("${run_args[@]}")
+
+set +e
+# An asynchronous child plus wait lets Bash handle cancellation immediately;
+# a foreground command would defer the trap until the review finishes.
+if [[ -n "$run_stdout" ]]; then
+  "${review_command[@]}" >"$run_stdout" &
+else
+  "${review_command[@]}" &
+fi
+review_pid=$!
+wait "$review_pid"
 exit_code=$?
+review_pid=""
 set -e
 
 if [[ "$format" == json && -s "$result_file" ]]; then
