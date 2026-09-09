@@ -194,6 +194,8 @@ cleanup_auth() {
 }
 credential_file=""
 trap cleanup_auth EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 if [[ "$auth_mode" == oidc ]]; then
   credential_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-ci-token.XXXXXX")"
@@ -264,24 +266,26 @@ if [[ "$format" == json ]]; then
   run_stdout="$result_file"
 fi
 
+review_command=(python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/timeout.py" adversary)
+
 set +e
 if [[ -n "$profile" && "$auth_mode" != none ]]; then
   if [[ -n "$run_stdout" ]]; then
-    adversary --profile "$profile" "${run_args[@]}" >"$run_stdout"
+    "${review_command[@]}" --profile "$profile" "${run_args[@]}" >"$run_stdout"
   else
-    adversary --profile "$profile" "${run_args[@]}"
+    "${review_command[@]}" --profile "$profile" "${run_args[@]}"
   fi
 else
   if [[ -n "$run_stdout" ]]; then
-    adversary "${run_args[@]}" >"$run_stdout"
+    "${review_command[@]}" "${run_args[@]}" >"$run_stdout"
   else
-    adversary "${run_args[@]}"
+    "${review_command[@]}" "${run_args[@]}"
   fi
 fi
 exit_code=$?
 set -e
 
-if [[ "$format" == json && -f "$result_file" ]]; then
+if [[ "$format" == json && -s "$result_file" ]]; then
   cat "$result_file"
   findings_count="$(python3 - "$result_file" <<'PY'
 import json

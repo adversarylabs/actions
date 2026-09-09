@@ -13,6 +13,9 @@ bash -n "$root/run/scripts/run.sh"
 grep -Fq 'name: Run Adversary' "$root/run/action.yml"
 grep -Fq 'using: composite' "$root/run/action.yml"
 grep -Fq 'adversaries:' "$root/run/action.yml"
+timeout_input="$(sed -n '/^  timeout-minutes:/,/^  timeout:/p' "$root/run/action.yml")"
+grep -Fq 'default: "10"' <<<"$timeout_input"
+grep -Fq 'INPUT_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}' "$root/run/action.yml"
 grep -Fq 'data-dir:' "$root/run/action.yml"
 grep -Fq 'INPUT_DATA_DIR: ${{ inputs.data-dir }}' "$root/run/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/run/action.yml")"
@@ -113,6 +116,7 @@ case "$command" in
     ;;
   logout) [[ "$1" == --local-only ]] ;;
   run)
+    if [[ "${HANG_REVIEW:-false}" == true ]]; then sleep 30; fi
     if [[ "${RUN_EXIT:-0}" == 1 ]]; then
       if [[ " $* " == *" --format json "* ]]; then
         printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[{"id":"f1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}'
@@ -453,5 +457,25 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
   echo "run accepted model-api-key without model-provider" >&2
   exit 1
 fi
+
+
+# A silent review is bounded across both output modes and still logs out.
+for timeout_format in text json; do
+  timeout_log="$tmp/timeout-$timeout_format.log"
+  timeout_output="$tmp/timeout-$timeout_format-output"
+  set +e
+  PATH="$fake_bin:$PATH" FAKE_LOG="$timeout_log" EXPECTED_TOKEN=adv_sa_timeout \
+    HANG_REVIEW=true RUNNER_TEMP="$runner" GITHUB_OUTPUT="$timeout_output" \
+    INPUT_TIMEOUT_MINUTES=0.01 INPUT_AUTH_MODE=token INPUT_TOKEN=adv_sa_timeout \
+    INPUT_FORMAT="$timeout_format" INPUT_FAIL_ON_FINDINGS=false \
+    bash "$root/run/scripts/run.sh" >"$tmp/timeout-$timeout_format-stdout" 2>&1
+  timeout_status=$?
+  set -e
+  [[ "$timeout_status" == 124 ]]
+  grep -Fq 'exceeded timeout-minutes' "$tmp/timeout-$timeout_format-stdout"
+  grep -Fq 'exit-code=124' "$timeout_output"
+  grep -Fq 'outcome=failure' "$timeout_output"
+  grep -Eq '^logout profile=run-action-[0-9]+-[0-9]+ args=--local-only' "$timeout_log"
+done
 
 echo "run action tests passed"

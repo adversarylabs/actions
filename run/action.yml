@@ -82,8 +82,12 @@ inputs:
     description: Explicitly allow unrestricted HostExecutor use for an unknown publisher (true or false).
     required: false
     default: "false"
+  timeout-minutes:
+    description: Maximum wall-clock minutes for the entire review command, including pulls, indexing, and all adversaries. Must be positive; fractional minutes are allowed.
+    required: false
+    default: "10"
   timeout:
-    description: Maximum adversary execution time as a Go duration (for example 10m). Empty or 0 disables the deadline.
+    description: Maximum individual adversary execution time as a Go duration (for example 10m). Empty or 0 disables the deadline.
     required: false
   build-timeout:
     description: Maximum explicit local build time as a Go duration (for example 10m).
@@ -140,7 +144,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: Exit code from adversary run (0 success, 1 findings, 2 usage, 3 execution failure, 4 network/auth).
+    description: Exit code from adversary run (0 success, 1 findings, 2 usage, 3 execution failure, 4 network/auth), or 124 when timeout-minutes expires.
     value: ${{ steps.run.outputs.exit-code }}
   findings-count:
     description: Number of findings when format is json; empty for text output.
@@ -184,6 +188,7 @@ runs:
         INPUT_INCLUDE_SUPPRESSED: ${{ inputs.include-suppressed }}
         INPUT_SHELL: ${{ inputs.shell }}
         INPUT_ALLOW_UNSAFE_HOST_EXECUTION: ${{ inputs.allow-unsafe-host-execution }}
+        INPUT_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_BUILD_TIMEOUT: ${{ inputs.build-timeout }}
         INPUT_MODEL_PROVIDER: ${{ inputs.model-provider }}
