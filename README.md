@@ -284,6 +284,8 @@ Provide `model-provider` (`openai`, `anthropic`, `fireworks`, or `camel`), `mode
 
 The action records the CLI exit code and outcome in its outputs. By default, CLI exit `1` (findings) becomes a successful step after the review is posted; exits `2`–`4` still fail. Set `fail-on-findings: true` only when findings should block the check. With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
 
+The entire review command has a 10-minute wall-clock deadline, including registry pulls, indexing, and all selected adversaries. Set `timeout-minutes: 5` for a shorter run or `timeout-minutes: 20` for a longer one under the action’s `with:` inputs. Positive fractional minutes are also supported. On expiry, the action terminates the review processes, allows up to 5 seconds for shutdown, then force-kills remaining processes and fails with `exit-code: 124` and `outcome: failure`, even when `fail-on-findings` is false. CLI installation and authentication are outside this deadline; a workflow/job timeout can bound those too. The standalone CLI default is unchanged. The existing `timeout` input remains a separate per-adversary execution limit.
+
 ### Run inputs
 
 | Input | Required | Default | Description |
@@ -309,7 +311,8 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 | `include-suppressed` | no | `false` | Request suppressed findings when supported. |
 | `shell` | no | `false` | UNSAFE host shell in the adversary working directory. |
 | `allow-unsafe-host-execution` | no | `false` | Allow unrestricted HostExecutor for an unknown publisher. |
-| `timeout` | no | — | Max execution time (Go duration, for example `10m`). |
+| `timeout-minutes` | no | `10` | Positive wall-clock minutes for the entire review command. |
+| `timeout` | no | — | Max individual adversary execution time (Go duration, for example `10m`). Empty or `0` disables this individual limit. |
 | `build-timeout` | no | — | Max explicit local build time (Go duration). |
 | `model-provider` | no | — | `openai`, `anthropic`, `fireworks`, or `camel`. |
 | `model` | no | — | Provider model identifier. |
@@ -331,7 +334,7 @@ The action records the CLI exit code and outcome in its outputs. By default, CLI
 
 | Output | Description |
 | --- | --- |
-| `exit-code` | CLI exit code (`0`–`4`). |
+| `exit-code` | CLI exit code (`0`–`4`), or `124` when the action review deadline expires. |
 | `findings-count` | Finding count when `format` is `json`; empty for text. |
 | `result-file` | Path to captured JSON stdout when `format` is `json`. |
 | `outcome` | `success`, `findings`, or `failure`. |
