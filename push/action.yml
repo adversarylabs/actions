@@ -5,7 +5,7 @@ inputs:
   cli-version:
     description: Exact Adversary CLI release tag to install.
     required: false
-    default: 2026.9.9-beta.4
+    default: 2026.9.12-beta.1
   path:
     description: Path to the adversary project, relative to the workspace.
     required: false
