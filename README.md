@@ -260,7 +260,7 @@ Pull-request scope is inferred from the CI environment. Use `base` and `head` to
 
 ### Pull-request reviews
 
-On `pull_request` and `pull_request_target` events, `github-review: auto` posts findings through GitHub's GraphQL review API and `github-submit: true` submits the review as an informational comment. Grant `pull-requests: write`; the action uses `github.token` unless `github-token` is supplied. The default summary covers actual findings only and uses the configured model provider for one cross-adversary synthesis; clean adversaries add nothing, and a clean run posts no review. Set `include-summary: false` to omit that persistent summary while retaining inline findings and findings that cannot be placed on the diff. Set `github-review: false` to keep results in the job log only.
+On `pull_request` and `pull_request_target` events, `github-review: auto` posts findings through GitHub's GraphQL review API and `github-submit: true` submits the review as an informational comment. Grant `pull-requests: write`; the action uses `github.token` unless `github-token` is supplied. After a complete successful rerun, the action resolves prior threads from the same GitHub identity when their findings are no longer reported by an adversary that ran again. Set `resolve-addressed-comments: false` to leave those threads open. Partial or failed reviews never resolve comments. The default summary covers actual findings only and uses the configured model provider for one cross-adversary synthesis; clean adversaries add nothing, and a clean run posts no review. Set `include-summary: false` to omit that persistent summary while retaining inline findings and findings that cannot be placed on the diff. Set `github-review: false` to keep results in the job log only.
 
 ### Authentication
 
@@ -300,6 +300,7 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | `github-review` | no | `auto` | `auto`, `true`, or `false`; auto posts on pull-request events. |
 | `github-submit` | no | `true` | Submit the GitHub review as an informational comment instead of leaving it pending. |
 | `include-summary` | no | `true` | Include the aggregate assessment/opinion in the review body; findings are still posted when false. |
+| `resolve-addressed-comments` | no | `true` | Resolve prior Adversary threads whose findings disappear after a complete successful rerun. |
 | `github-token` | no | `github.token` | Token used to post the GitHub review. |
 | `builder` | no | `local` | `local` or `docker` builder for local adversaries. |
 | `build` | no | `false` | Build a local adversary before running. |
