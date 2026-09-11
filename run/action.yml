@@ -9,7 +9,7 @@ inputs:
   cli-version:
     description: Exact Adversary CLI release tag to install.
     required: false
-    default: 2026.9.9-beta.4
+    default: 2026.9.12-beta.1
   path:
     description: Path to the source directory to review, relative to the workspace.
     required: false
@@ -37,6 +37,10 @@ inputs:
     default: "true"
   include-summary:
     description: Include the aggregate assessment and opinion in the GitHub review body (true or false). Inline and body-only findings are still posted when false.
+    required: false
+    default: "true"
+  resolve-addressed-comments:
+    description: Resolve prior Adversary review threads when a successful rerun no longer reports their findings (true or false).
     required: false
     default: "true"
   github-token:
@@ -178,6 +182,7 @@ runs:
         INPUT_GITHUB_REVIEW: ${{ inputs.github-review }}
         INPUT_GITHUB_SUBMIT: ${{ inputs.github-submit }}
         INPUT_INCLUDE_SUMMARY: ${{ inputs.include-summary }}
+        INPUT_RESOLVE_ADDRESSED_COMMENTS: ${{ inputs.resolve-addressed-comments }}
         INPUT_BUILDER: ${{ inputs.builder }}
         INPUT_BUILD: ${{ inputs.build }}
         INPUT_FORCE: ${{ inputs.force }}

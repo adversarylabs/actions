@@ -18,6 +18,7 @@ all_files="${INPUT_ALL_FILES:-false}"
 github_review="${INPUT_GITHUB_REVIEW:-auto}"
 github_submit="${INPUT_GITHUB_SUBMIT:-true}"
 include_summary="${INPUT_INCLUDE_SUMMARY:-true}"
+resolve_addressed_comments="${INPUT_RESOLVE_ADDRESSED_COMMENTS:-true}"
 builder="${INPUT_BUILDER:-local}"
 build="${INPUT_BUILD:-false}"
 force="${INPUT_FORCE:-false}"
@@ -81,6 +82,7 @@ fi
 require_bool all-files "$all_files"
 require_bool github-submit "$github_submit"
 require_bool include-summary "$include_summary"
+require_bool resolve-addressed-comments "$resolve_addressed_comments"
 require_bool build "$build"
 require_bool force "$force"
 require_bool keep-temp "$keep_temp"
@@ -265,6 +267,7 @@ if [[ "$github_review_enabled" == true ]]; then
   run_args+=(--github-review)
   if [[ "$github_submit" == true ]]; then run_args+=(--github-submit); fi
   if [[ "$include_summary" == false ]]; then run_args+=(--github-include-summary=false); fi
+  if [[ "$resolve_addressed_comments" == false ]]; then run_args+=(--github-resolve-addressed=false); fi
 fi
 
 result_file=""

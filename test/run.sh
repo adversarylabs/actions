@@ -20,7 +20,7 @@ grep -Fq 'data-dir:' "$root/run/action.yml"
 grep -Fq 'INPUT_DATA_DIR: ${{ inputs.data-dir }}' "$root/run/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/run/action.yml")"
 grep -Fq 'required: false' <<<"$cli_version_input"
-grep -Fq 'default: 2026.9.9-beta.4' <<<"$cli_version_input"
+grep -Fq 'default: 2026.9.12-beta.1' <<<"$cli_version_input"
 adversaries_input="$(sed -n '/^  adversaries:/,/^  cli-version:/p' "$root/run/action.yml")"
 grep -Fq 'required: false' <<<"$adversaries_input"
 grep -Fq 'default: auto' <<<"$adversaries_input"
@@ -39,6 +39,9 @@ github_submit_input="$(sed -n '/^  github-submit:/,/^  github-token:/p' "$root/r
 grep -Fq 'default: "true"' <<<"$github_submit_input"
 include_summary_input="$(sed -n '/^  include-summary:/,/^  github-token:/p' "$root/run/action.yml")"
 grep -Fq 'default: "true"' <<<"$include_summary_input"
+resolve_addressed_input="$(sed -n '/^  resolve-addressed-comments:/,/^  github-token:/p' "$root/run/action.yml")"
+grep -Fq 'default: "true"' <<<"$resolve_addressed_input"
+grep -Fq 'INPUT_RESOLVE_ADDRESSED_COMMENTS: ${{ inputs.resolve-addressed-comments }}' "$root/run/action.yml"
 fail_on_findings_input="$(sed -n '/^  fail-on-findings:/,/^  api-url:/p' "$root/run/action.yml")"
 grep -Fq 'default: "false"' <<<"$fail_on_findings_input"
 path_input="$(sed -n '/^  path:/,/^  base:/p' "$root/run/action.yml")"
@@ -237,6 +240,16 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$pr_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
 grep -Fq 'run profile=default args=--path . --format text --github-review --github-submit --github-include-summary=false' "$pr_log"
+
+pr_no_resolve_log="$tmp/pr-no-resolve.log"
+pr_no_resolve_output="$tmp/pr-no-resolve-output"
+: >"$pr_no_resolve_log"
+PATH="$fake_bin:$PATH" FAKE_LOG="$pr_no_resolve_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$pr_no_resolve_output" \
+  GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/42/merge \
+  GITHUB_REPOSITORY=adversarylabs/actions GITHUB_TOKEN=github-do-not-print \
+  INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_RESOLVE_ADDRESSED_COMMENTS=false \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
+grep -Fq 'args=--path . --format text --github-review --github-submit --github-resolve-addressed=false' "$pr_no_resolve_log"
 if grep -Fq 'github-do-not-print' "$pr_log" "$pr_output"; then
   echo "GitHub token leaked into run action output" >&2
   exit 1

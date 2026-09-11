@@ -110,7 +110,7 @@ jobs:
         run: echo "Pushed ${{ steps.push.outputs.reference }} at ${{ steps.push.outputs.digest }}"
 ```
 
-When `cli-version` is omitted, the action installs its pinned default, `2026.9.9-beta.4`. Set `cli-version` explicitly to test a different release. Pin the action itself to an exact release tag or full commit SHA for reproducible CI.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.12-beta.1`. Set `cli-version` explicitly to test a different release. Pin the action itself to an exact release tag or full commit SHA for reproducible CI.
 
 The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`; configure the matching Node runtime before invoking the action. pnpm and Yarn installs require Corepack, which is not bundled with Node.js 25 and later; install Corepack separately on those runtimes. For reproducible pnpm or Yarn installs, pin the exact tool version in the `packageManager` field of `package.json`.
 
@@ -138,7 +138,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `cli-version` | no | `2026.9.9-beta.4` | Exact Adversary CLI release tag. |
+| `cli-version` | no | `2026.9.12-beta.1` | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Adversary project directory. |
 | `builder` | no | `local` | `local` or `docker` package builder. |
 | `install-dependencies` | no | `true` | Install dependencies from a supported lockfile before local packaging. Set to `false` when already installed; ignored by the Docker builder. |
@@ -208,7 +208,7 @@ jobs:
           echo "findings=${{ steps.review.outputs.findings-count }}"
 ```
 
-When `cli-version` is omitted, the action installs its pinned default, `2026.9.9-beta.4`. Set `cli-version` explicitly to test a different release, and pin the action ref for reproducible CI. `path` defaults to `.`.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.12-beta.1`. Set `cli-version` explicitly to test a different release, and pin the action ref for reproducible CI. `path` defaults to `.`.
 
 ### Artifact cache
 
@@ -260,7 +260,7 @@ Pull-request scope is inferred from the CI environment. Use `base` and `head` to
 
 ### Pull-request reviews
 
-On `pull_request` and `pull_request_target` events, `github-review: auto` posts findings through GitHub's GraphQL review API and `github-submit: true` submits the review as an informational comment. Grant `pull-requests: write`; the action uses `github.token` unless `github-token` is supplied. The default summary covers actual findings only and uses the configured model provider for one cross-adversary synthesis; clean adversaries add nothing, and a clean run posts no review. Set `include-summary: false` to omit that persistent summary while retaining inline findings and findings that cannot be placed on the diff. Set `github-review: false` to keep results in the job log only.
+On `pull_request` and `pull_request_target` events, `github-review: auto` posts findings through GitHub's GraphQL review API and `github-submit: true` submits the review as an informational comment. Grant `pull-requests: write`; the action uses `github.token` unless `github-token` is supplied. After a complete successful rerun, the action resolves prior threads from the same GitHub identity when their findings are no longer reported by an adversary that ran again. Set `resolve-addressed-comments: false` to leave those threads open. Partial or failed reviews never resolve comments. The default summary covers actual findings only and uses the configured model provider for one cross-adversary synthesis; clean adversaries add nothing, and a clean run posts no review. Set `include-summary: false` to omit that persistent summary while retaining inline findings and findings that cannot be placed on the diff. Set `github-review: false` to keep results in the job log only.
 
 ### Authentication
 
@@ -291,7 +291,7 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
 | `adversaries` | no | `auto` | `auto` to pull and select matching accessible adversaries, or one or more explicit refs (whitespace or newlines). |
-| `cli-version` | no | `2026.9.9-beta.4` | Exact Adversary CLI release tag. |
+| `cli-version` | no | `2026.9.12-beta.1` | Exact Adversary CLI release tag. |
 | `path` | no | `.` | Source directory to review. |
 | `data-dir` | no | `${RUNNER_TEMP}/adversary-data` | Absolute directory containing cacheable adversary artifacts. `ADVERSARY_DATA_DIR` is used as a fallback when set. |
 | `base` | no | — | Git base ref for change detection. |
@@ -300,6 +300,7 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | `github-review` | no | `auto` | `auto`, `true`, or `false`; auto posts on pull-request events. |
 | `github-submit` | no | `true` | Submit the GitHub review as an informational comment instead of leaving it pending. |
 | `include-summary` | no | `true` | Include the aggregate assessment/opinion in the review body; findings are still posted when false. |
+| `resolve-addressed-comments` | no | `true` | Resolve prior Adversary threads whose findings disappear after a complete successful rerun. |
 | `github-token` | no | `github.token` | Token used to post the GitHub review. |
 | `builder` | no | `local` | `local` or `docker` builder for local adversaries. |
 | `build` | no | `false` | Build a local adversary before running. |
