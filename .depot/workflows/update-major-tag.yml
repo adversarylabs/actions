@@ -1,8 +1,8 @@
 name: Update moving major tag
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*.*.*']
 
 permissions:
   contents: write
@@ -13,8 +13,8 @@ concurrency:
 
 jobs:
   update:
-    if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
-    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: depot-ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -22,5 +22,5 @@ jobs:
       - name: Update moving major tag
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: bash scripts/update-major-tag.sh
