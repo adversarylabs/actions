@@ -10,9 +10,38 @@ if [[ ! "$release_tag" =~ ^v([0-9]+)\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 major_tag="v${BASH_REMATCH[1]}"
-latest_tag="$(gh api -X GET "repos/${repository}/releases/latest" --jq .tag_name)"
+latest_tag=""
+while IFS= read -r ref; do
+  candidate="${ref#refs/tags/}"
+  if [[ ! "$candidate" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    continue
+  fi
+
+  candidate_version=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+  if [[ -z "$latest_tag" ]]; then
+    latest_tag="$candidate"
+    latest_version=("${candidate_version[@]}")
+    continue
+  fi
+
+  for index in 0 1 2; do
+    if ((10#${candidate_version[$index]} > 10#${latest_version[$index]})); then
+      latest_tag="$candidate"
+      latest_version=("${candidate_version[@]}")
+      break
+    fi
+    if ((10#${candidate_version[$index]} < 10#${latest_version[$index]})); then
+      break
+    fi
+  done
+done < <(gh api --paginate "repos/${repository}/git/matching-refs/tags/${major_tag}." --jq '.[].ref')
+
+if [[ -z "$latest_tag" ]]; then
+  echo "GitHub did not return any stable ${major_tag}.x.x tags." >&2
+  exit 1
+fi
 if [[ "$release_tag" != "$latest_tag" ]]; then
-  printf 'Skipping %s because GitHub reports %s as the latest stable release.\n' "$release_tag" "$latest_tag"
+  printf 'Skipping %s because %s is the latest stable tag.\n' "$release_tag" "$latest_tag"
   exit 0
 fi
 
