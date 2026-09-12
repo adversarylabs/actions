@@ -278,7 +278,7 @@ Use `auth-mode: token` with a pull-scoped service-account token when OIDC is una
 
 ### Model-backed adversaries
 
-Provide `model-provider` (`openai`, `anthropic`, `fireworks`, or `camel`), `model`, and `model-api-key` (a secret). The action maps the key to `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `FIREWORKS_API_KEY`, or `CAMEL_API_KEY` and never places API keys on the CLI argument list. Optional `openai-base-url`, `anthropic-base-url`, `fireworks-base-url`, and `camel-base-url` set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
+Provide `model-provider` (`openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`), `model`, and `model-api-key` (a secret). The action maps the key to the selected provider's credential environment variable and never places API keys on the CLI argument list. For Cloudflare AI Gateway, also set `cloudflare-account-id`; `cloudflare-gateway-id` is optional. Provider-specific base URL inputs set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
 
 ### Exit codes and findings
 
@@ -315,10 +315,13 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | `timeout-minutes` | no | `10` | Positive wall-clock minutes for the entire review command. |
 | `timeout` | no | — | Max individual adversary execution time (Go duration, for example `10m`). Empty or `0` disables this individual limit. |
 | `build-timeout` | no | — | Max explicit local build time (Go duration). |
-| `model-provider` | no | — | `openai`, `anthropic`, `fireworks`, or `camel`. |
+| `model-provider` | no | — | `openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`. |
 | `model` | no | — | Provider model identifier. |
 | `model-api-key` | no | — | Provider API key secret mapped from `model-provider`. |
 | `openai-base-url` | no | — | OpenAI-compatible base URL override. |
+| `cloudflare-account-id` | with Cloudflare | — | Cloudflare account ID. |
+| `cloudflare-gateway-id` | no | — | Optional Cloudflare AI Gateway ID. |
+| `cloudflare-base-url` | no | — | Cloudflare AI REST API base URL override. |
 | `anthropic-base-url` | no | — | Anthropic-compatible base URL override. |
 | `fireworks-base-url` | no | — | Fireworks-compatible base URL override. |
 | `camel-base-url` | no | — | Camel-compatible base URL override. |
