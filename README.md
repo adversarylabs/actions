@@ -24,13 +24,13 @@ The version action treats a `v`-prefixed release version as the source of truth.
 
 - name: Synchronize release metadata
   id: version
-  uses: adversarylabs/actions/version@v1.1.0
+  uses: adversarylabs/actions/version@v1
   with:
     tag: ${{ github.ref_name }}
     token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
 - name: Push
-  uses: adversarylabs/actions/push@v1.1.0
+  uses: adversarylabs/actions/push@v1
   with:
     auth-mode: token
     token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
@@ -99,7 +99,7 @@ jobs:
 
       - name: Push
         id: push
-        uses: adversarylabs/actions/push@v1.1.0
+        uses: adversarylabs/actions/push@v1
         with:
           path: .
           registry-namespace: your-team-slug
@@ -125,7 +125,7 @@ For an interactive run, set `auth-mode: oauth`. The CLI prints a device-login UR
 Set `auth-mode: existing` to skip login. This supports a runner with a preconfigured CLI profile or an external OCI registry authenticated through Docker’s credential store. When `profile` is omitted, the action uses the CLI's default profile; set `profile` explicitly to use a different preconfigured profile. Use `remote-reference` for an explicit registry destination:
 
 ```yaml
-- uses: adversarylabs/actions/push@v1.1.0
+- uses: adversarylabs/actions/push@v1
   with:
     cli-version: 2026.7.9-beta.1
     auth-mode: existing
