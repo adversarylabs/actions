@@ -35,6 +35,9 @@ model_provider="${INPUT_MODEL_PROVIDER:-}"
 model="${INPUT_MODEL:-}"
 model_api_key="${INPUT_MODEL_API_KEY:-}"
 openai_base_url="${INPUT_OPENAI_BASE_URL:-}"
+cloudflare_account_id="${INPUT_CLOUDFLARE_ACCOUNT_ID:-${CLOUDFLARE_ACCOUNT_ID:-}}"
+cloudflare_gateway_id="${INPUT_CLOUDFLARE_GATEWAY_ID:-}"
+cloudflare_base_url="${INPUT_CLOUDFLARE_BASE_URL:-}"
 anthropic_base_url="${INPUT_ANTHROPIC_BASE_URL:-}"
 fireworks_base_url="${INPUT_FIREWORKS_BASE_URL:-}"
 camel_base_url="${INPUT_CAMEL_BASE_URL:-}"
@@ -153,10 +156,15 @@ fi
 
 model_provider="$(printf '%s' "$model_provider" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 model="$(printf '%s' "$model" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+cloudflare_account_id="$(printf '%s' "$cloudflare_account_id" | tr -d '[:space:]')"
 case "$model_provider" in
-  ""|openai|anthropic|fireworks|camel|camel-stream) ;;
-  *) echo "model-provider must be openai, anthropic, fireworks, or camel" >&2; exit 2 ;;
+  ""|openai|cloudflare|anthropic|fireworks|camel|camel-stream) ;;
+  *) echo "model-provider must be openai, cloudflare, anthropic, fireworks, or camel" >&2; exit 2 ;;
 esac
+if [[ "$model_provider" == cloudflare && -z "$cloudflare_account_id" ]]; then
+  echo "cloudflare-account-id is required when model-provider is cloudflare" >&2
+  exit 2
+fi
 if [[ -n "$model_api_key" && -z "$model_provider" ]]; then
   echo "model-provider is required when model-api-key is set" >&2
   exit 2
@@ -164,6 +172,7 @@ fi
 if [[ -n "$model_api_key" ]]; then
   case "$model_provider" in
     openai) export OPENAI_API_KEY="$model_api_key" ;;
+    cloudflare) export CLOUDFLARE_API_TOKEN="$model_api_key" ;;
     anthropic) export ANTHROPIC_API_KEY="$model_api_key" ;;
     fireworks) export FIREWORKS_API_KEY="$model_api_key" ;;
     camel|camel-stream) export CAMEL_API_KEY="$model_api_key" ;;
@@ -171,6 +180,9 @@ if [[ -n "$model_api_key" ]]; then
   model_api_key=''
 fi
 if [[ -n "$openai_base_url" ]]; then export ADVERSARY_OPENAI_BASE_URL="$openai_base_url"; fi
+if [[ -n "$cloudflare_account_id" ]]; then export CLOUDFLARE_ACCOUNT_ID="$cloudflare_account_id"; fi
+if [[ -n "$cloudflare_gateway_id" ]]; then export ADVERSARY_CLOUDFLARE_GATEWAY_ID="$cloudflare_gateway_id"; fi
+if [[ -n "$cloudflare_base_url" ]]; then export ADVERSARY_CLOUDFLARE_BASE_URL="$cloudflare_base_url"; fi
 if [[ -n "$anthropic_base_url" ]]; then export ADVERSARY_ANTHROPIC_BASE_URL="$anthropic_base_url"; fi
 if [[ -n "$fireworks_base_url" ]]; then export ADVERSARY_FIREWORKS_BASE_URL="$fireworks_base_url"; fi
 if [[ -n "$camel_base_url" ]]; then export ADVERSARY_CAMEL_BASE_URL="$camel_base_url"; fi

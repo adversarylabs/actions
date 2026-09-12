@@ -97,16 +97,25 @@ inputs:
     description: Maximum explicit local build time as a Go duration (for example 10m).
     required: false
   model-provider:
-    description: Model provider for model-backed adversaries (openai, anthropic, fireworks, or camel). Overrides ADVERSARY_MODEL_PROVIDER.
+    description: Model provider for model-backed adversaries (openai, cloudflare, anthropic, fireworks, or camel). Overrides ADVERSARY_MODEL_PROVIDER.
     required: false
   model:
     description: Provider model identifier for model-backed adversaries. Overrides ADVERSARY_MODEL.
     required: false
   model-api-key:
-    description: Provider API key for model-backed adversaries. Mapped to OPENAI_API_KEY, ANTHROPIC_API_KEY, FIREWORKS_API_KEY, or CAMEL_API_KEY based on model-provider. Prefer a Depot CI or GitHub Actions secret.
+    description: Provider API key for model-backed adversaries. Mapped to the selected provider's credential environment variable. Prefer a Depot CI or GitHub Actions secret.
     required: false
   openai-base-url:
     description: Optional OpenAI-compatible base URL override (ADVERSARY_OPENAI_BASE_URL).
+    required: false
+  cloudflare-account-id:
+    description: Cloudflare account ID used by the AI Gateway REST API (CLOUDFLARE_ACCOUNT_ID).
+    required: false
+  cloudflare-gateway-id:
+    description: Optional Cloudflare AI Gateway ID (ADVERSARY_CLOUDFLARE_GATEWAY_ID).
+    required: false
+  cloudflare-base-url:
+    description: Optional Cloudflare AI REST API base URL override (ADVERSARY_CLOUDFLARE_BASE_URL).
     required: false
   anthropic-base-url:
     description: Optional Anthropic-compatible base URL override (ADVERSARY_ANTHROPIC_BASE_URL).
@@ -200,6 +209,9 @@ runs:
         INPUT_MODEL: ${{ inputs.model }}
         INPUT_MODEL_API_KEY: ${{ inputs.model-api-key }}
         INPUT_OPENAI_BASE_URL: ${{ inputs.openai-base-url }}
+        INPUT_CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        INPUT_CLOUDFLARE_GATEWAY_ID: ${{ inputs.cloudflare-gateway-id }}
+        INPUT_CLOUDFLARE_BASE_URL: ${{ inputs.cloudflare-base-url }}
         INPUT_ANTHROPIC_BASE_URL: ${{ inputs.anthropic-base-url }}
         INPUT_FIREWORKS_BASE_URL: ${{ inputs.fireworks-base-url }}
         INPUT_CAMEL_BASE_URL: ${{ inputs.camel-base-url }}
