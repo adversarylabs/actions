@@ -316,5 +316,6 @@ bash "$root/test/runtime-version.sh"
 bash "$root/test/version.sh"
 bash "$root/test/run.sh"
 bash "$root/test/oidc.sh"
+bash "$root/test/update-major-tag.sh"
 
 python3 -B "$root/test/timeout.py"
