@@ -35,7 +35,7 @@ model_provider="${INPUT_MODEL_PROVIDER:-}"
 model="${INPUT_MODEL:-}"
 model_api_key="${INPUT_MODEL_API_KEY:-}"
 openai_base_url="${INPUT_OPENAI_BASE_URL:-}"
-cloudflare_account_id="${INPUT_CLOUDFLARE_ACCOUNT_ID:-}"
+cloudflare_account_id="${INPUT_CLOUDFLARE_ACCOUNT_ID:-${CLOUDFLARE_ACCOUNT_ID:-}}"
 cloudflare_gateway_id="${INPUT_CLOUDFLARE_GATEWAY_ID:-}"
 cloudflare_base_url="${INPUT_CLOUDFLARE_BASE_URL:-}"
 anthropic_base_url="${INPUT_ANTHROPIC_BASE_URL:-}"
@@ -156,10 +156,15 @@ fi
 
 model_provider="$(printf '%s' "$model_provider" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 model="$(printf '%s' "$model" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+cloudflare_account_id="$(printf '%s' "$cloudflare_account_id" | tr -d '[:space:]')"
 case "$model_provider" in
   ""|openai|cloudflare|anthropic|fireworks|camel|camel-stream) ;;
   *) echo "model-provider must be openai, cloudflare, anthropic, fireworks, or camel" >&2; exit 2 ;;
 esac
+if [[ "$model_provider" == cloudflare && -z "$cloudflare_account_id" ]]; then
+  echo "cloudflare-account-id is required when model-provider is cloudflare" >&2
+  exit 2
+fi
 if [[ -n "$model_api_key" && -z "$model_provider" ]]; then
   echo "model-provider is required when model-api-key is set" >&2
   exit 2

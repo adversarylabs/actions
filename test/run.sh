@@ -291,13 +291,23 @@ fi
 cloudflare_log="$tmp/cloudflare-model.log"
 cloudflare_output="$tmp/cloudflare-model-output"
 : >"$cloudflare_log"
+if PATH="$fake_bin:$PATH" FAKE_LOG="$cloudflare_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$cloudflare_output" \
+  INPUT_ADVERSARIES='adversarylabs/go-cli' INPUT_PATH=. INPUT_MODEL_PROVIDER=cloudflare \
+  INPUT_MODEL='openai/gpt-5.5' INPUT_MODEL_API_KEY='cf-do-not-print' \
+  bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" \
+  >/dev/null 2>"$tmp/cloudflare-missing-account-stderr"; then
+  echo "Cloudflare model provider accepted a missing account ID" >&2
+  exit 1
+fi
+grep -Fq 'cloudflare-account-id is required when model-provider is cloudflare' "$tmp/cloudflare-missing-account-stderr"
+
 PATH="$fake_bin:$PATH" FAKE_LOG="$cloudflare_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$cloudflare_output" \
   INPUT_ADVERSARIES='adversarylabs/go-cli' INPUT_PATH=. INPUT_MODEL_PROVIDER=cloudflare \
   INPUT_MODEL='openai/gpt-5.5' INPUT_MODEL_API_KEY='cf-do-not-print' \
   INPUT_CLOUDFLARE_ACCOUNT_ID='account-id' INPUT_CLOUDFLARE_GATEWAY_ID='review-gateway' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
-grep -Fq 'run profile=default args=adversarylabs/go-cli --path . --format text --model-provider cloudflare --model openai/gpt-5.5' "$cloudflare_log"
+grep -Fq 'run profile=default args=adversarylabs/go-cli --path . --builder local --format text --model-provider cloudflare --model openai/gpt-5.5' "$cloudflare_log"
 grep -Fq 'CLOUDFLARE_API_TOKEN=cf-do-not-print CLOUDFLARE_ACCOUNT_ID=account-id ADVERSARY_CLOUDFLARE_GATEWAY_ID=review-gateway' "$cloudflare_log"
 if grep -Fq 'cf-do-not-print' "$cloudflare_output"; then
   echo "Cloudflare API token leaked into action outputs" >&2
