@@ -9,7 +9,7 @@ inputs:
   cli-version:
     description: Exact Adversary CLI release tag to install.
     required: false
-    default: 2026.9.13
+    default: 2026.9.15-beta.1
   path:
     description: Path to the source directory to review, relative to the workspace.
     required: false
