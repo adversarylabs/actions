@@ -121,6 +121,9 @@ elif args[0] == "logout":
                     RUNNER_TEMP=str(root), GITHUB_OUTPUT=str(root / "outputs"),
                     INPUT_AUTH_MODE="token", INPUT_TOKEN="adv_sa_test",
                     INPUT_FORMAT=output_format,
+                    ADVERSARY_MODEL_PROVIDER="openai",
+                    ADVERSARY_MODEL="test-review-model",
+                    OPENAI_API_KEY="test-review-key",
                 )
                 process = subprocess.Popen(
                     ["bash", str(SCRIPT.parent / "run.sh")], env=env,

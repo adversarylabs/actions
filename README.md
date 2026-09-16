@@ -278,11 +278,13 @@ Use `auth-mode: token` with a pull-scoped service-account token when OIDC is una
 
 ### Model-backed adversaries
 
-Provide `model-provider` (`openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`), `model`, and `model-api-key` (a secret). The action maps the key to the selected provider's credential environment variable and never places API keys on the CLI argument list. For Cloudflare AI Gateway, also set `cloudflare-account-id`; `cloudflare-gateway-id` is optional. Provider-specific base URL inputs set the corresponding `ADVERSARY_*_BASE_URL` overrides. You may also set the standard provider environment variables on the step yourself and omit `model-api-key`.
+CI reviews require a model and a working provider credential: a partial review is not a passing review. Provide `model-provider` (`openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`), `model`, and `model-api-key` (a secret). The action maps the key to the selected provider's credential environment variable and never places API keys on the CLI argument list. For Cloudflare AI Gateway, also set `cloudflare-account-id`; `cloudflare-gateway-id` is optional. Provider-specific base URL inputs set the corresponding `ADVERSARY_*_BASE_URL` overrides.
+
+You may instead set `ADVERSARY_MODEL`, optionally `ADVERSARY_MODEL_PROVIDER`, and the standard provider credential environment variable on the step. The provider may be omitted only when exactly one supported provider credential is present. Missing configuration fails before the review starts; an unusable credential or another reviewer execution failure that makes the composed review incomplete also fails the step.
 
 ### Exit codes and findings
 
-The action records the CLI exit code and outcome in its outputs. By default, CLI exit `1` (findings) becomes a successful step after the review is posted; exits `2`–`4` still fail. Set `fail-on-findings: true` only when findings should block the check. With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
+The action records the CLI exit code and outcome in its outputs. By default, CLI exit `1` (findings) becomes a successful step after the review is posted; exits `2`–`4` still fail. An otherwise successful partial review is promoted to exit `3` and `outcome: failure`. Set `fail-on-findings: true` only when findings should block the check. With `format: json`, `findings-count` and `result-file` are populated from captured stdout.
 
 The entire review command has a 10-minute wall-clock deadline, including registry pulls, indexing, and all selected adversaries. Set `timeout-minutes: 5` for a shorter run or `timeout-minutes: 20` for a longer one under the action’s `with:` inputs. Positive fractional minutes are also supported. On expiry, the action terminates the review processes, allows up to 5 seconds for shutdown, then force-kills remaining processes and fails with `exit-code: 124` and `outcome: failure`, even when `fail-on-findings` is false. CLI installation and authentication are outside this deadline; a workflow/job timeout can bound those too. The standalone CLI default is unchanged. The existing `timeout` input remains a separate per-adversary execution limit.
 
@@ -315,9 +317,9 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | `timeout-minutes` | no | `10` | Positive wall-clock minutes for the entire review command. |
 | `timeout` | no | — | Max individual adversary execution time (Go duration, for example `10m`). Empty or `0` disables this individual limit. |
 | `build-timeout` | no | — | Max explicit local build time (Go duration). |
-| `model-provider` | no | — | `openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`. |
-| `model` | no | — | Provider model identifier. |
-| `model-api-key` | no | — | Provider API key secret mapped from `model-provider`. |
+| `model-provider` | unless exactly one provider credential is in the environment | — | `openai`, `cloudflare`, `anthropic`, `fireworks`, or `camel`. |
+| `model` | yes* | — | Provider model identifier. May instead be supplied through `ADVERSARY_MODEL`. |
+| `model-api-key` | yes* | — | Provider API key secret mapped from `model-provider`. May instead be supplied through the provider's standard environment variable. |
 | `openai-base-url` | no | — | OpenAI-compatible base URL override. |
 | `cloudflare-account-id` | with Cloudflare | — | Cloudflare account ID. |
 | `cloudflare-gateway-id` | no | — | Optional Cloudflare AI Gateway ID. |

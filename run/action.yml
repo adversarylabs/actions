@@ -97,13 +97,13 @@ inputs:
     description: Maximum explicit local build time as a Go duration (for example 10m).
     required: false
   model-provider:
-    description: Model provider for model-backed adversaries (openai, cloudflare, anthropic, fireworks, or camel). Overrides ADVERSARY_MODEL_PROVIDER.
+    description: Model provider for model-backed adversaries (openai, cloudflare, anthropic, fireworks, or camel). Overrides ADVERSARY_MODEL_PROVIDER. Required unless exactly one supported provider key is present.
     required: false
   model:
-    description: Provider model identifier for model-backed adversaries. Overrides ADVERSARY_MODEL.
+    description: Provider model identifier for model-backed adversaries. Overrides ADVERSARY_MODEL. A model is required because CI rejects partial, non-model reviews.
     required: false
   model-api-key:
-    description: Provider API key for model-backed adversaries. Mapped to the selected provider's credential environment variable. Prefer a Depot CI or GitHub Actions secret.
+    description: Required provider API key for model-backed adversaries. Mapped to the selected provider's credential environment variable. Prefer a Depot CI or GitHub Actions secret.
     required: false
   openai-base-url:
     description: Optional OpenAI-compatible base URL override (ADVERSARY_OPENAI_BASE_URL).

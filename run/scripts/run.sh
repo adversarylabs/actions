@@ -161,16 +161,28 @@ case "$model_provider" in
   ""|openai|cloudflare|anthropic|fireworks|camel|camel-stream) ;;
   *) echo "model-provider must be openai, cloudflare, anthropic, fireworks, or camel" >&2; exit 2 ;;
 esac
-if [[ "$model_provider" == cloudflare && -z "$cloudflare_account_id" ]]; then
+effective_model_provider="${model_provider:-${ADVERSARY_MODEL_PROVIDER:-}}"
+effective_model_provider="$(printf '%s' "$effective_model_provider" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+effective_model="${model:-${ADVERSARY_MODEL:-}}"
+effective_model="$(printf '%s' "$effective_model" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+case "$effective_model_provider" in
+  ""|openai|cloudflare|anthropic|fireworks|camel|camel-stream) ;;
+  *) echo "ADVERSARY_MODEL_PROVIDER must be openai, cloudflare, anthropic, fireworks, or camel" >&2; exit 2 ;;
+esac
+if [[ "$effective_model_provider" == cloudflare && -z "$cloudflare_account_id" ]]; then
   echo "cloudflare-account-id is required when model-provider is cloudflare" >&2
   exit 2
 fi
-if [[ -n "$model_api_key" && -z "$model_provider" ]]; then
+if [[ -z "$effective_model" ]]; then
+  echo "model is required for CI reviews (set model or ADVERSARY_MODEL)" >&2
+  exit 2
+fi
+if [[ -n "$model_api_key" && -z "$effective_model_provider" ]]; then
   echo "model-provider is required when model-api-key is set" >&2
   exit 2
 fi
 if [[ -n "$model_api_key" ]]; then
-  case "$model_provider" in
+  case "$effective_model_provider" in
     openai) export OPENAI_API_KEY="$model_api_key" ;;
     cloudflare) export CLOUDFLARE_API_TOKEN="$model_api_key" ;;
     anthropic) export ANTHROPIC_API_KEY="$model_api_key" ;;
@@ -178,6 +190,47 @@ if [[ -n "$model_api_key" ]]; then
     camel|camel-stream) export CAMEL_API_KEY="$model_api_key" ;;
   esac
   model_api_key=''
+fi
+
+# CI reviews must never silently degrade to the non-model reviewers. Validate
+# the same provider credential contract the CLI uses before any review jobs run.
+if [[ -z "$effective_model_provider" ]]; then
+  configured_model_providers=()
+  [[ -n "${OPENAI_API_KEY:-}" ]] && configured_model_providers+=(openai)
+  if [[ -n "${CLOUDFLARE_API_TOKEN:-}" || -n "$cloudflare_account_id" ]]; then
+    if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+      echo "CLOUDFLARE_API_TOKEN is required for model provider cloudflare" >&2
+      exit 2
+    fi
+    if [[ -z "$cloudflare_account_id" ]]; then
+      echo "cloudflare-account-id or CLOUDFLARE_ACCOUNT_ID is required for model provider cloudflare" >&2
+      exit 2
+    fi
+    configured_model_providers+=(cloudflare)
+  fi
+  [[ -n "${ANTHROPIC_API_KEY:-}" ]] && configured_model_providers+=(anthropic)
+  [[ -n "${FIREWORKS_API_KEY:-}" ]] && configured_model_providers+=(fireworks)
+  [[ -n "${CAMEL_API_KEY:-}" ]] && configured_model_providers+=(camel)
+  if [[ ${#configured_model_providers[@]} -eq 0 ]]; then
+    echo "a model provider API key is required for CI reviews" >&2
+    exit 2
+  fi
+  if [[ ${#configured_model_providers[@]} -gt 1 ]]; then
+    echo "model-provider or ADVERSARY_MODEL_PROVIDER is required when multiple model provider keys are configured" >&2
+    exit 2
+  fi
+  effective_model_provider="${configured_model_providers[0]}"
+fi
+case "$effective_model_provider" in
+  openai) model_key="${OPENAI_API_KEY:-}" ;;
+  cloudflare) model_key="${CLOUDFLARE_API_TOKEN:-}" ;;
+  anthropic) model_key="${ANTHROPIC_API_KEY:-}" ;;
+  fireworks) model_key="${FIREWORKS_API_KEY:-}" ;;
+  camel|camel-stream) model_key="${CAMEL_API_KEY:-}" ;;
+esac
+if [[ -z "$model_key" ]]; then
+  echo "the API key for model provider ${effective_model_provider} is required for CI reviews" >&2
+  exit 2
 fi
 if [[ -n "$openai_base_url" ]]; then export ADVERSARY_OPENAI_BASE_URL="$openai_base_url"; fi
 if [[ -n "$cloudflare_account_id" ]]; then export CLOUDFLARE_ACCOUNT_ID="$cloudflare_account_id"; fi
@@ -202,11 +255,13 @@ if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then export ADVERSARY_REGISTRY_NAME
 
 cleanup_auth() {
   if [[ -n "${credential_file:-}" ]]; then rm -f "$credential_file"; fi
+  if [[ -n "${captured_stdout:-}" ]]; then rm -f "$captured_stdout"; fi
   if [[ "${owns_temp_profile:-false}" == true && -n "${profile:-}" ]]; then
     adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true
   fi
 }
 credential_file=""
+captured_stdout=""
 trap cleanup_auth EXIT
 review_pid=""
 cancel_review() {
@@ -290,6 +345,9 @@ if [[ "$format" == json ]]; then
   # do not overwrite each other's result-file outputs.
   result_file="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-run.XXXXXX")"
   run_stdout="$result_file"
+else
+  captured_stdout="$(mktemp "${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-run-stdout.XXXXXX")"
+  run_stdout="$captured_stdout"
 fi
 
 review_command=(python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/timeout.py" adversary)
@@ -302,19 +360,48 @@ review_command+=("${run_args[@]}")
 set +e
 # An asynchronous child plus wait lets Bash handle cancellation immediately;
 # a foreground command would defer the trap until the review finishes.
-if [[ -n "$run_stdout" ]]; then
-  "${review_command[@]}" >"$run_stdout" &
-else
-  "${review_command[@]}" &
-fi
+"${review_command[@]}" >"$run_stdout" &
 review_pid=$!
 wait "$review_pid"
 exit_code=$?
 review_pid=""
 set -e
 
+if [[ -s "$run_stdout" ]]; then
+  cat "$run_stdout"
+fi
+
+incomplete_review=false
+if [[ "$format" == json ]]; then
+  if python3 - "$run_stdout" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as stream:
+        payload = json.load(stream)
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+def has_incomplete_review(value):
+    if isinstance(value, dict):
+        if value.get("key") == "composition.incomplete":
+            return True
+        return any(has_incomplete_review(item) for item in value.values())
+    if isinstance(value, list):
+        return any(has_incomplete_review(item) for item in value)
+    return False
+
+raise SystemExit(0 if has_incomplete_review(payload) else 1)
+PY
+  then
+    incomplete_review=true
+  fi
+elif grep -Eq 'Partial review: [0-9]+ review jobs failed;' "$run_stdout"; then
+  incomplete_review=true
+fi
+
 if [[ "$format" == json && -s "$result_file" ]]; then
-  cat "$result_file"
   findings_count="$(python3 - "$result_file" <<'PY'
 import json
 import sys
@@ -353,6 +440,11 @@ def count_findings(value):
 print(count_findings(payload))
 PY
   )" || findings_count=""
+fi
+
+if [[ "$incomplete_review" == true && ( "$exit_code" -eq 0 || "$exit_code" -eq 1 ) ]]; then
+  echo "adversary run produced an incomplete review; failing CI because partial reviews are not accepted" >&2
+  exit_code=3
 fi
 
 outcome=failure
