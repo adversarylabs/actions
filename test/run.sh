@@ -7,6 +7,11 @@ trap 'rm -rf "$tmp"' EXIT
 
 # Keep action auto-detection deterministic even when this test itself runs on a PR.
 unset GITHUB_EVENT_NAME GITHUB_REF GITHUB_REPOSITORY GITHUB_TOKEN ADVERSARY_DATA_DIR
+unset ADVERSARY_MODEL_PROVIDER ADVERSARY_MODEL OPENAI_API_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+unset ANTHROPIC_API_KEY FIREWORKS_API_KEY CAMEL_API_KEY
+export ADVERSARY_MODEL_PROVIDER=openai
+export ADVERSARY_MODEL=test-review-model
+export OPENAI_API_KEY=test-review-key
 
 bash -n "$root/run/scripts/install.sh"
 bash -n "$root/run/scripts/run.sh"
@@ -121,6 +126,14 @@ case "$command" in
   logout) [[ "$1" == --local-only ]] ;;
   run)
     if [[ "${HANG_REVIEW:-false}" == true ]]; then sleep 30; fi
+    if [[ "${PARTIAL_REVIEW:-false}" == true ]]; then
+      if [[ " $* " == *" --format json "* ]]; then
+        printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[{"key":"composition.incomplete","summary":"Partial review: one review job failed."}],"findings":[],"suppressed":{"observations":0,"findings":0}}}'
+      else
+        printf '%s\n' 'Partial review: 1 review jobs failed; no clean-review opinion.'
+      fi
+      exit 0
+    fi
     if [[ "${RUN_EXIT:-0}" == 1 ]]; then
       if [[ " $* " == *" --format json "* ]]; then
         printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[{"id":"f1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}'
@@ -487,6 +500,7 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
 fi
 
 if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  ADVERSARY_MODEL_PROVIDER='' \
   INPUT_ADVERSARIES='example' INPUT_PATH=. INPUT_AUTH_MODE=none \
   INPUT_MODEL_API_KEY='sk-test' INPUT_MODEL_PROVIDER='' \
   INPUT_ALL_FILES=false INPUT_BUILD=false INPUT_FORCE=false INPUT_FORMAT=text \
@@ -498,6 +512,39 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
   exit 1
 fi
 
+missing_model_stderr="$tmp/missing-model-stderr"
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  ADVERSARY_MODEL='' INPUT_MODEL='' INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none \
+  bash "$root/run/scripts/run.sh" >/dev/null 2>"$missing_model_stderr"; then
+  echo "run accepted a missing model" >&2
+  exit 1
+fi
+grep -Fq 'model is required for CI reviews' "$missing_model_stderr"
+
+missing_key_stderr="$tmp/missing-key-stderr"
+if PATH="$fake_bin:$PATH" FAKE_LOG="$log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$run_output" \
+  OPENAI_API_KEY='' INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none \
+  bash "$root/run/scripts/run.sh" >/dev/null 2>"$missing_key_stderr"; then
+  echo "run accepted a missing model provider API key" >&2
+  exit 1
+fi
+grep -Fq 'API key for model provider openai is required for CI reviews' "$missing_key_stderr"
+
+for partial_format in text json; do
+  partial_output="$tmp/partial-$partial_format-output"
+  partial_stderr="$tmp/partial-$partial_format-stderr"
+  set +e
+  PATH="$fake_bin:$PATH" FAKE_LOG="$log" PARTIAL_REVIEW=true \
+    RUNNER_TEMP="$runner" GITHUB_OUTPUT="$partial_output" \
+    INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_FORMAT="$partial_format" \
+    bash "$root/run/scripts/run.sh" >"$tmp/partial-$partial_format-stdout" 2>"$partial_stderr"
+  partial_status=$?
+  set -e
+  [[ "$partial_status" == 3 ]]
+  grep -Fq 'incomplete review; failing CI' "$partial_stderr"
+  grep -Fq 'exit-code=3' "$partial_output"
+  grep -Fq 'outcome=failure' "$partial_output"
+done
 
 # A silent review is bounded across both output modes and still logs out.
 for timeout_format in text json; do
