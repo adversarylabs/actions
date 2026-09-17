@@ -131,13 +131,43 @@ shutil.copyfile(root / responses[url], output)
         self.assertEqual(self.install(base="https://downloads.example.test/releases"),
                          [["Authorization: Bearer test-github-token"], [], []])
 
+    def test_unexpected_github_api_paths_receive_no_token(self):
+        for api in (
+            "https://api.github.com/repos/other/project/releases/latest",
+            "https://api.github.com/repos/adversarylabs/other/releases/latest",
+            "https://api.github.com/repos/adversarylabs/adversary/issues",
+            f"{LATEST_API}/../latest",
+            f"{LATEST_API}?redirect=other",
+            f"{LATEST_API}#fragment",
+        ):
+            with self.subTest(api=api):
+                self.assertEqual(self.install(api=api),
+                                 [[], ["Authorization: Bearer test-github-token"],
+                                  ["Authorization: Bearer test-github-token"]])
+
+    def test_unexpected_github_asset_paths_receive_no_token(self):
+        for base in (
+            f"https://github.com/other/project/releases/download/{VERSION}",
+            f"https://github.com/adversarylabs/other/releases/download/{VERSION}",
+            "https://github.com/adversarylabs/adversary/releases/download/9.9.9",
+            f"{DOWNLOAD_BASE}/../{VERSION}",
+            f"{DOWNLOAD_BASE}/%2e%2e/{VERSION}",
+            f"https://github.com/adversarylabs/adversary/blob/main/{VERSION}",
+        ):
+            with self.subTest(base=base):
+                self.assertEqual(self.install(base=base),
+                                 [["Authorization: Bearer test-github-token"], [], []])
+
     def test_non_github_and_insecure_urls_receive_no_token(self):
         for origin in ("https://downloads.example.test", "https://github.com.example.test",
                        "https://api.github.com.example.test", "https://github.com@other.example.test",
+                       "https://user@api.github.com", "https://github.com:8443",
                        "http://github.com", "http://api.github.com", "file:///fixture"):
             with self.subTest(origin=origin):
-                self.assertEqual(self.install(api=f"{origin}/latest", base=f"{origin}/releases"),
-                                 [[], [], []])
+                self.assertEqual(self.install(
+                    api=f"{origin}/repos/adversarylabs/adversary/releases/latest",
+                    base=f"{origin}/adversarylabs/adversary/releases/download/{VERSION}",
+                ), [[], [], []])
 
 
 if __name__ == "__main__":
