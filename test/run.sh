@@ -59,6 +59,7 @@ if grep -Eq 'email-address:|INPUT_EMAIL_ADDRESS|password:|INPUT_PASSWORD' "$root
   exit 1
 fi
 install_step="$(sed -n '/- name: Install Adversary CLI/,/- name: Authenticate and run/p' "$root/run/action.yml")"
+grep -Fq 'GITHUB_TOKEN: ${{ inputs.github-token || github.token }}' <<<"$install_step"
 if grep -Eq 'INPUT_TOKEN|INPUT_MODEL_API_KEY|INPUT_AUTH_MODE' <<<"$install_step"; then
   echo "run action metadata mixes secrets into the install step" >&2
   exit 1
