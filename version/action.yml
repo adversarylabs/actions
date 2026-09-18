@@ -1,4 +1,4 @@
-name: Version Adversary
+name: Version Doomer
 description: Synchronize release metadata and runtime identity from a tag, rebuild, verify, and commit idempotently.
 
 inputs:

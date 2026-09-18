@@ -15,7 +15,7 @@ export OPENAI_API_KEY=test-review-key
 
 bash -n "$root/run/scripts/install.sh"
 bash -n "$root/run/scripts/run.sh"
-grep -Fq 'name: Run Adversary' "$root/run/action.yml"
+grep -Fq 'name: Run Doomer' "$root/run/action.yml"
 grep -Fq 'using: composite' "$root/run/action.yml"
 grep -Fq 'adversaries:' "$root/run/action.yml"
 timeout_input="$(sed -n '/^  timeout-minutes:/,/^  timeout:/p' "$root/run/action.yml")"
@@ -25,7 +25,7 @@ grep -Fq 'data-dir:' "$root/run/action.yml"
 grep -Fq 'INPUT_DATA_DIR: ${{ inputs.data-dir }}' "$root/run/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/run/action.yml")"
 grep -Fq 'required: false' <<<"$cli_version_input"
-grep -Fq 'default: 2026.9.18-beta.1' <<<"$cli_version_input"
+grep -Fq 'default: 2026.9.18' <<<"$cli_version_input"
 adversaries_input="$(sed -n '/^  adversaries:/,/^  cli-version:/p' "$root/run/action.yml")"
 grep -Fq 'required: false' <<<"$adversaries_input"
 grep -Fq 'default: auto' <<<"$adversaries_input"
@@ -58,7 +58,7 @@ if grep -Eq 'email-address:|INPUT_EMAIL_ADDRESS|password:|INPUT_PASSWORD' "$root
   echo "run action metadata still exposes password authentication" >&2
   exit 1
 fi
-install_step="$(sed -n '/- name: Install Adversary CLI/,/- name: Authenticate and run/p' "$root/run/action.yml")"
+install_step="$(sed -n '/- name: Install Doomer CLI/,/- name: Authenticate and run/p' "$root/run/action.yml")"
 grep -Fq 'GITHUB_TOKEN: ${{ inputs.github-token || github.token }}' <<<"$install_step"
 if grep -Eq 'INPUT_TOKEN|INPUT_MODEL_API_KEY|INPUT_AUTH_MODE' <<<"$install_step"; then
   echo "run action metadata mixes secrets into the install step" >&2
@@ -71,10 +71,10 @@ case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *
 version=1.2.3-rc-1+build.5
 release="$tmp/release"
 mkdir -p "$release/archive"
-printf '#!/usr/bin/env bash\necho "adversary test-version"\n' >"$release/archive/adversary"
-chmod +x "$release/archive/adversary"
-archive="adversary_${version}_${os}_${arch}.tar.gz"
-tar -czf "$release/$archive" -C "$release/archive" adversary
+printf '#!/usr/bin/env bash\necho "adversary test-version"\n' >"$release/archive/doomer"
+chmod +x "$release/archive/doomer"
+archive="doomer_${version}_${os}_${arch}.tar.gz"
+tar -czf "$release/$archive" -C "$release/archive" doomer
 if command -v sha256sum >/dev/null 2>&1; then
   checksum="$(sha256sum "$release/$archive" | awk '{print $1}')"
 else
@@ -87,13 +87,13 @@ mkdir -p "$runner"
 github_path="$tmp/github-path"
 INPUT_CLI_VERSION="$version" RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/run/scripts/install.sh" >/dev/null
-installed="$(tail -n 1 "$github_path")/adversary"
+installed="$(tail -n 1 "$github_path")/doomer"
 [[ -x "$installed" ]]
 [[ "$("$installed" version)" == "adversary test-version" ]]
 
 fake_bin="$tmp/bin"
 mkdir -p "$fake_bin"
-cat >"$fake_bin/adversary" <<'FAKE'
+cat >"$fake_bin/doomer" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 profile=default
@@ -120,7 +120,7 @@ case "$command" in
       IFS= read -r supplied
       [[ "$supplied" == "$EXPECTED_TOKEN" ]]
     else
-      [[ "$*" == '--ci --name Adversary run action' ]]
+      [[ "$*" == '--ci --name Doomer run action' ]]
     fi
     if [[ "${FAIL_LOGIN:-false}" == true ]]; then exit 7; fi
     ;;
@@ -129,7 +129,7 @@ case "$command" in
     if [[ "${HANG_REVIEW:-false}" == true ]]; then sleep 30; fi
     if [[ "${PARTIAL_REVIEW:-false}" == true ]]; then
       if [[ " $* " == *" --format json "* ]]; then
-        printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[{"key":"composition.incomplete","summary":"Partial review: one review job failed."}],"findings":[],"suppressed":{"observations":0,"findings":0}}}'
+        printf '%s\n' '{"protocolVersion":1,"result":{"doomer":{"name":"example"},"target":{},"positives":[],"observations":[{"key":"composition.incomplete","summary":"Partial review: one review job failed."}],"findings":[],"suppressed":{"observations":0,"findings":0}}}'
       else
         printf '%s\n' 'Partial review: 1 review jobs failed; no clean-review opinion.'
       fi
@@ -137,15 +137,15 @@ case "$command" in
     fi
     if [[ "${RUN_EXIT:-0}" == 1 ]]; then
       if [[ " $* " == *" --format json "* ]]; then
-        printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[{"id":"f1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}'
+        printf '%s\n' '{"protocolVersion":1,"result":{"doomer":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[{"id":"f1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}'
       fi
       exit 1
     fi
     if [[ " $* " == *" --format json "* ]]; then
       if [[ "$*" == *"adversarylabs/a adversarylabs/b"* ]] || [[ "$*" == *"adversarylabs/a"*"adversarylabs/b"* ]]; then
-        printf '%s\n' '{"results":[{"adversary":"adversarylabs/a","output":{"protocolVersion":1,"result":{"adversary":{"name":"a"},"target":{},"positives":[],"observations":[],"findings":[{"id":"1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}},{"adversary":"adversarylabs/b","output":{"protocolVersion":1,"result":{"adversary":{"name":"b"},"target":{},"positives":[],"observations":[],"findings":[],"suppressed":{"observations":0,"findings":0}}}}]}'
+        printf '%s\n' '{"results":[{"doomer":"adversarylabs/a","output":{"protocolVersion":1,"result":{"doomer":{"name":"a"},"target":{},"positives":[],"observations":[],"findings":[{"id":"1","title":"t","category":"c","severity":"low","confidence":"high","summary":"s","evidence":[]}],"suppressed":{"observations":0,"findings":0}}}},{"doomer":"adversarylabs/b","output":{"protocolVersion":1,"result":{"doomer":{"name":"b"},"target":{},"positives":[],"observations":[],"findings":[],"suppressed":{"observations":0,"findings":0}}}}]}'
       else
-        printf '%s\n' '{"protocolVersion":1,"result":{"adversary":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[],"suppressed":{"observations":0,"findings":0}}}'
+        printf '%s\n' '{"protocolVersion":1,"result":{"doomer":{"name":"example"},"target":{},"positives":[],"observations":[],"findings":[],"suppressed":{"observations":0,"findings":0}}}'
       fi
     else
       printf 'review ok\n'
@@ -155,7 +155,7 @@ case "$command" in
   *) echo "unexpected command: $command" >&2; exit 9 ;;
 esac
 FAKE
-chmod +x "$fake_bin/adversary"
+chmod +x "$fake_bin/doomer"
 
 mkdir -p "$tmp/work/src"
 run_output="$tmp/run-output"
@@ -171,7 +171,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$log" EXPECTED_TOKEN='adv_sa_do-not-print-me' \
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >"$tmp/run-stdout"
 
@@ -205,7 +205,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$auto_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT=
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
@@ -282,7 +282,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$model_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT
   INPUT_MODEL_API_KEY='sk-do-not-print' INPUT_OPENAI_BASE_URL='https://openai.example' \
   INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >"$tmp/model-stdout"
 
@@ -354,7 +354,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$model_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 second_result_file="$(sed -n 's/^result-file=//p' "$second_output" | head -n 1)"
@@ -377,7 +377,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$multi_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE=preconfigured \
-  INPUT_AUTH_MODE=existing INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=existing INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
@@ -401,7 +401,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$explicit_log" EXPECTED_TOKEN='adv_sa_do-not-pr
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE=preconfigured \
-  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=token INPUT_TOKEN='adv_sa_do-not-print-me' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE=adversarylabs \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 grep -Eq 'login profile=preconfigured-[0-9]+-[0-9]+ args=--token-stdin --registry-namespace adversarylabs' "$explicit_log"
@@ -422,7 +422,7 @@ if PATH="$fake_bin:$PATH" FAKE_LOG="$findings_log" RUN_EXIT=1 RUNNER_TEMP="$runn
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_FAIL_ON_FINDINGS=true INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null 2>"$tmp/findings-stderr"; then
   echo "run continued after findings with fail-on-findings true" >&2
@@ -442,7 +442,7 @@ PATH="$fake_bin:$PATH" FAKE_LOG="$findings_log" RUN_EXIT=1 RUNNER_TEMP="$runner"
   INPUT_TIMEOUT='' INPUT_BUILD_TIMEOUT='' INPUT_MODEL_PROVIDER='' INPUT_MODEL='' \
   INPUT_MODEL_API_KEY='' INPUT_OPENAI_BASE_URL='' INPUT_ANTHROPIC_BASE_URL='' INPUT_FIREWORKS_BASE_URL='' \
   INPUT_API_URL=https://api.example INPUT_PROFILE='' \
-  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Adversary run action' \
+  INPUT_AUTH_MODE=none INPUT_TOKEN='' INPUT_CLIENT_NAME='Doomer run action' \
   INPUT_REGISTRY_HOST='' INPUT_REGISTRY_NAMESPACE='' \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 grep -Fq 'exit-code=1' "$soft_output"

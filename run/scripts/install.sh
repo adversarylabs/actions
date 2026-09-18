@@ -36,11 +36,11 @@ download() {
 
 version="${INPUT_CLI_VERSION:-}"
 if [[ -z "$version" ]]; then
-  default_latest_api="https://api.github.com/repos/doomerlabs/adversary/releases/latest"
+  default_latest_api="https://api.github.com/repos/doomerlabs/doomer/releases/latest"
   latest_api="${ADVERSARY_LATEST_RELEASE_API:-$default_latest_api}"
-  latest_metadata="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-latest-release.json"
+  latest_metadata="${RUNNER_TEMP:?RUNNER_TEMP is required}/doomer-latest-release.json"
   if ! download "$latest_api" "$latest_metadata" "$default_latest_api"; then
-    echo "No stable Adversary CLI release could be resolved from GitHub. Set cli-version explicitly to use a prerelease." >&2
+    echo "No stable Doomer CLI release could be resolved from GitHub. Set cli-version explicitly to use a prerelease." >&2
     exit 2
   fi
   if ! version="$(python3 - "$latest_metadata" <<'PY'
@@ -57,10 +57,10 @@ if not isinstance(tag, str) or not tag:
 print(tag)
 PY
   )"; then
-    echo "GitHub did not return a valid stable Adversary CLI release. Set cli-version explicitly to use a prerelease." >&2
+    echo "GitHub did not return a valid stable Doomer CLI release. Set cli-version explicitly to use a prerelease." >&2
     exit 2
   fi
-  printf 'Resolved latest stable Adversary CLI release: %s\n' "$version"
+  printf 'Resolved latest stable Doomer CLI release: %s\n' "$version"
 fi
 
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
@@ -80,11 +80,11 @@ case "$(uname -m)" in
   *) echo "Unsupported runner architecture: $(uname -m)" >&2; exit 2 ;;
 esac
 
-archive="adversary_${version}_${os}_${arch}.tar.gz"
-release_base="https://github.com/doomerlabs/adversary/releases/download/${version}"
+archive="doomer_${version}_${os}_${arch}.tar.gz"
+release_base="https://github.com/doomerlabs/doomer/releases/download/${version}"
 base="${ADVERSARY_DOWNLOAD_BASE:-$release_base}"
-install_dir="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-cli-${version}"
-download_dir="${RUNNER_TEMP}/adversary-download-${version}"
+install_dir="${RUNNER_TEMP:?RUNNER_TEMP is required}/doomer-cli-${version}"
+download_dir="${RUNNER_TEMP}/doomer-download-${version}"
 rm -rf -- "$install_dir" "$download_dir"
 mkdir -p -- "$install_dir" "$download_dir"
 
@@ -111,10 +111,10 @@ if [[ "$actual" != "$expected" ]]; then
 fi
 
 tar -xzf "${download_dir}/${archive}" -C "$install_dir"
-if [[ ! -f "${install_dir}/adversary" ]]; then
-  echo "The verified release archive does not contain the adversary binary." >&2
+if [[ ! -f "${install_dir}/doomer" ]]; then
+  echo "The verified release archive does not contain the doomer binary." >&2
   exit 3
 fi
-chmod +x "${install_dir}/adversary"
-"${install_dir}/adversary" version
+chmod +x "${install_dir}/doomer"
+"${install_dir}/doomer" version
 printf '%s\n' "$install_dir" >>"${GITHUB_PATH:?GITHUB_PATH is required}"

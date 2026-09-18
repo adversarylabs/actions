@@ -292,7 +292,7 @@ async function verifyBuiltRuntime(directory, command, expected) {
   }
   const app = await runtimeModule.createApp()
   if (app?.version !== expected) {
-    throw new Error(`${relative(directory, entrypoint)} reports adversary version ${String(app?.version)}; expected ${expected}`)
+    throw new Error(`${relative(directory, entrypoint)} reports doomer version ${String(app?.version)}; expected ${expected}`)
   }
 }
 

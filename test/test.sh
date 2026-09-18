@@ -8,12 +8,12 @@ trap 'rm -rf "$tmp"' EXIT
 bash -n "$root/push/scripts/install.sh"
 bash -n "$root/push/scripts/package.sh"
 bash -n "$root/push/scripts/push.sh"
-grep -Fq 'name: Push Adversary' "$root/push/action.yml"
+grep -Fq 'name: Push Doomer' "$root/push/action.yml"
 grep -Fq 'using: composite' "$root/push/action.yml"
 grep -Fq 'cli-version:' "$root/push/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/push/action.yml")"
 grep -Fq 'required: false' <<<"$cli_version_input"
-grep -Fq 'default: 2026.9.18-beta.1' <<<"$cli_version_input"
+grep -Fq 'default: 2026.9.18' <<<"$cli_version_input"
 if grep -Fq 'required: true' <<<"$cli_version_input"; then
   echo "cli-version is still required" >&2
   exit 1
@@ -39,10 +39,10 @@ case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *
 version=1.2.3-rc-1+build.5
 release="$tmp/release"
 mkdir -p "$release/archive"
-printf '#!/usr/bin/env bash\necho "adversary test-version"\n' >"$release/archive/adversary"
-chmod +x "$release/archive/adversary"
-archive="adversary_${version}_${os}_${arch}.tar.gz"
-tar -czf "$release/$archive" -C "$release/archive" adversary
+printf '#!/usr/bin/env bash\necho "adversary test-version"\n' >"$release/archive/doomer"
+chmod +x "$release/archive/doomer"
+archive="doomer_${version}_${os}_${arch}.tar.gz"
+tar -czf "$release/$archive" -C "$release/archive" doomer
 if command -v sha256sum >/dev/null 2>&1; then
   checksum="$(sha256sum "$release/$archive" | awk '{print $1}')"
 else
@@ -55,7 +55,7 @@ mkdir -p "$runner"
 github_path="$tmp/github-path"
 INPUT_CLI_VERSION="$version" RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_DOWNLOAD_BASE="file://$release" bash "$root/push/scripts/install.sh" >/dev/null
-installed="$(tail -n 1 "$github_path")/adversary"
+installed="$(tail -n 1 "$github_path")/doomer"
 [[ -x "$installed" ]]
 [[ "$("$installed" version)" == "adversary test-version" ]]
 
@@ -69,8 +69,8 @@ latest_output="$tmp/latest-output"
 INPUT_CLI_VERSION='' RUNNER_TEMP="$runner" GITHUB_PATH="$github_path" \
   ADVERSARY_LATEST_RELEASE_API="file://$latest_metadata" ADVERSARY_DOWNLOAD_BASE="file://$release" \
   bash "$root/push/scripts/install.sh" >"$latest_output"
-grep -Fq "Resolved latest stable Adversary CLI release: $version" "$latest_output"
-installed="$(tail -n 1 "$github_path")/adversary"
+grep -Fq "Resolved latest stable Doomer CLI release: $version" "$latest_output"
+installed="$(tail -n 1 "$github_path")/doomer"
 [[ -x "$installed" ]]
 
 prerelease_metadata="$tmp/prerelease.json"
@@ -98,7 +98,7 @@ fi
 
 fake_bin="$tmp/bin"
 mkdir -p "$fake_bin"
-cat >"$fake_bin/adversary" <<'FAKE'
+cat >"$fake_bin/doomer" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
 profile=default
@@ -129,7 +129,7 @@ case "$command" in
   *) echo "unexpected command: $command" >&2; exit 9 ;;
 esac
 FAKE
-chmod +x "$fake_bin/adversary"
+chmod +x "$fake_bin/doomer"
 
 cat >"$fake_bin/npm" <<'FAKE'
 #!/usr/bin/env bash

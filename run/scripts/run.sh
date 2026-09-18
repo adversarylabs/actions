@@ -42,11 +42,11 @@ anthropic_base_url="${INPUT_ANTHROPIC_BASE_URL:-}"
 fireworks_base_url="${INPUT_FIREWORKS_BASE_URL:-}"
 camel_base_url="${INPUT_CAMEL_BASE_URL:-}"
 fail_on_findings="${INPUT_FAIL_ON_FINDINGS:-false}"
-api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
+api_url="${INPUT_API_URL:-https://doomer.ai/api}"
 profile="${INPUT_PROFILE:-}"
 auth_mode="${INPUT_AUTH_MODE:-none}"
 token="${INPUT_TOKEN:-}"
-client_name="${INPUT_CLIENT_NAME:-Adversary run action}"
+client_name="${INPUT_CLIENT_NAME:-Doomer run action}"
 unset INPUT_TOKEN INPUT_MODEL_API_KEY
 
 if [[ -z "$data_dir" ]]; then
@@ -257,7 +257,7 @@ cleanup_auth() {
   if [[ -n "${credential_file:-}" ]]; then rm -f "$credential_file"; fi
   if [[ -n "${captured_stdout:-}" ]]; then rm -f "$captured_stdout"; fi
   if [[ "${owns_temp_profile:-false}" == true && -n "${profile:-}" ]]; then
-    adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true
+    doomer --profile "$profile" logout --local-only >/dev/null 2>&1 || true
   fi
 }
 credential_file=""
@@ -289,7 +289,7 @@ if [[ "$auth_mode" == oidc ]]; then
   [[ "$token" == adv_ci_* && "$namespace" == "${INPUT_REGISTRY_NAMESPACE:-}" ]] || {
     echo "OIDC exchange returned unexpected credentials" >&2; exit 4;
   }
-  printf '%s\n' "$token" | adversary --profile "$profile" login --token-stdin --registry-namespace "$namespace"
+  printf '%s\n' "$token" | doomer --profile "$profile" login --token-stdin --registry-namespace "$namespace"
   token=''
 elif [[ "$auth_mode" == token ]]; then
   if [[ -z "$token" ]]; then
@@ -297,17 +297,17 @@ elif [[ "$auth_mode" == token ]]; then
     exit 2
   fi
   if [[ "$token" != adv_sa_* ]]; then
-    echo "token must be an Adversary Labs service account token" >&2
+    echo "token must be an Doomer service account token" >&2
     exit 2
   fi
   login_args=(--profile "$profile" login --token-stdin)
   if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then
     login_args+=(--registry-namespace "$INPUT_REGISTRY_NAMESPACE")
   fi
-  printf '%s\n' "$token" | adversary "${login_args[@]}"
+  printf '%s\n' "$token" | doomer "${login_args[@]}"
   token=''
 elif [[ "$auth_mode" == oauth ]]; then
-  adversary --profile "$profile" login --ci --name "$client_name"
+  doomer --profile "$profile" login --ci --name "$client_name"
 fi
 
 run_args=(run)
@@ -350,7 +350,7 @@ else
   run_stdout="$captured_stdout"
 fi
 
-review_command=(python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/timeout.py" adversary)
+review_command=(python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/timeout.py" doomer)
 
 if [[ -n "$profile" && "$auth_mode" != none ]]; then
   review_command+=(--profile "$profile")
@@ -443,7 +443,7 @@ PY
 fi
 
 if [[ "$incomplete_review" == true && ( "$exit_code" -eq 0 || "$exit_code" -eq 1 ) ]]; then
-  echo "adversary run produced an incomplete review; failing CI because partial reviews are not accepted" >&2
+  echo "doomer run produced an incomplete review; failing CI because partial reviews are not accepted" >&2
   exit_code=3
 fi
 
@@ -462,7 +462,7 @@ esac
 } >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
 if [[ "$exit_code" -eq 1 && "$fail_on_findings" == false ]]; then
-  printf 'adversary run reported findings (exit 1); fail-on-findings is false\n' >&2
+  printf 'doomer run reported findings (exit 1); fail-on-findings is false\n' >&2
   exit 0
 fi
 
