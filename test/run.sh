@@ -250,7 +250,7 @@ pr_output="$tmp/pr-output"
 : >"$pr_log"
 PATH="$fake_bin:$PATH" FAKE_LOG="$pr_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$pr_output" \
   GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/42/merge \
-  GITHUB_REPOSITORY=adversarylabs/actions GITHUB_TOKEN=github-do-not-print \
+  GITHUB_REPOSITORY=doomerlabs/actions GITHUB_TOKEN=github-do-not-print \
   INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_INCLUDE_SUMMARY=false \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 
@@ -261,7 +261,7 @@ pr_no_resolve_output="$tmp/pr-no-resolve-output"
 : >"$pr_no_resolve_log"
 PATH="$fake_bin:$PATH" FAKE_LOG="$pr_no_resolve_log" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$pr_no_resolve_output" \
   GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/42/merge \
-  GITHUB_REPOSITORY=adversarylabs/actions GITHUB_TOKEN=github-do-not-print \
+  GITHUB_REPOSITORY=doomerlabs/actions GITHUB_TOKEN=github-do-not-print \
   INPUT_ADVERSARIES=auto INPUT_PATH=. INPUT_AUTH_MODE=none INPUT_RESOLVE_ADDRESSED_COMMENTS=false \
   bash -c 'cd "$1" && bash "$2"' _ "$tmp/work" "$root/run/scripts/run.sh" >/dev/null
 grep -Fq 'args=--path . --format text --github-review --github-submit --github-resolve-addressed=false' "$pr_no_resolve_log"

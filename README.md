@@ -24,13 +24,13 @@ The version action treats a `v`-prefixed release version as the source of truth.
 
 - name: Synchronize release metadata
   id: version
-  uses: adversarylabs/actions/version@v1
+  uses: doomerlabs/actions/version@v1
   with:
     tag: ${{ github.ref_name }}
     token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
 - name: Push
-  uses: adversarylabs/actions/push@v1
+  uses: doomerlabs/actions/push@v1
   with:
     auth-mode: token
     token: ${{ secrets.ADVERSARY_SERVICE_ACCOUNT_TOKEN }}
@@ -99,7 +99,7 @@ jobs:
 
       - name: Push
         id: push
-        uses: adversarylabs/actions/push@v1
+        uses: doomerlabs/actions/push@v1
         with:
           path: .
           registry-namespace: your-team-slug
@@ -125,7 +125,7 @@ For an interactive run, set `auth-mode: oauth`. The CLI prints a device-login UR
 Set `auth-mode: existing` to skip login. This supports a runner with a preconfigured CLI profile or an external OCI registry authenticated through Docker’s credential store. When `profile` is omitted, the action uses the CLI's default profile; set `profile` explicitly to use a different preconfigured profile. Use `remote-reference` for an explicit registry destination:
 
 ```yaml
-- uses: adversarylabs/actions/push@v1
+- uses: doomerlabs/actions/push@v1
   with:
     cli-version: 2026.7.9-beta.1
     auth-mode: existing
@@ -191,7 +191,7 @@ jobs:
 
       - name: Run adversaries
         id: review
-        uses: adversarylabs/actions/run@v1
+        uses: doomerlabs/actions/run@v1
         with:
           path: .
           auth-mode: oidc
@@ -226,7 +226,7 @@ Depot CI can persist the directory with a durable cache disk. Use a repository-s
     path: /mnt/adversary
 
 - name: Run adversaries
-  uses: adversarylabs/actions/run@v1
+  uses: doomerlabs/actions/run@v1
   with:
     data-dir: /mnt/adversary
     adversaries: auto
@@ -239,9 +239,9 @@ Other CI cache implementations can restore and save `${{ runner.temp }}/adversar
 Automatic selection is the default. These are equivalent:
 
 ```yaml
-- uses: adversarylabs/actions/run@v1
+- uses: doomerlabs/actions/run@v1
 
-- uses: adversarylabs/actions/run@v1
+- uses: doomerlabs/actions/run@v1
   with:
     adversaries: auto
 ```
@@ -249,7 +249,7 @@ Automatic selection is the default. These are equivalent:
 To bypass automatic selection, provide explicit references. Each explicit adversary still applies its own changed-file trigger unless `force: true` is set:
 
 ```yaml
-- uses: adversarylabs/actions/run@v1
+- uses: doomerlabs/actions/run@v1
   with:
     adversaries: |
       web/nextjs
@@ -267,7 +267,7 @@ On `pull_request` and `pull_request_target` events, `github-review: auto` posts 
 Default `auth-mode: none` skips login so public and local adversaries work without a token. For private pulls, prefer `auth-mode: oidc`, add `permissions: id-token: write`, trust the GitHub or Depot repository identity on the team page, and set `registry-namespace`. The exchanged pull credential lasts ten minutes and the action removes its unique temporary profile afterward.
 
 ```yaml
-- uses: adversarylabs/actions/run@v1
+- uses: doomerlabs/actions/run@v1
   with:
     adversaries: your-team/private-reviewer
     auth-mode: oidc
