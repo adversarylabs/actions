@@ -12,7 +12,7 @@ download() {
 
 version="${INPUT_CLI_VERSION:-}"
 if [[ -z "$version" ]]; then
-  latest_api="${ADVERSARY_LATEST_RELEASE_API:-https://api.github.com/repos/adversarylabs/adversary/releases/latest}"
+  latest_api="${ADVERSARY_LATEST_RELEASE_API:-https://api.github.com/repos/doomerlabs/adversary/releases/latest}"
   latest_metadata="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-latest-release.json"
   if ! download "$latest_api" "$latest_metadata"; then
     echo "No stable Adversary CLI release could be resolved from GitHub. Set cli-version explicitly to use a prerelease." >&2
@@ -56,7 +56,7 @@ case "$(uname -m)" in
 esac
 
 archive="adversary_${version}_${os}_${arch}.tar.gz"
-base="${ADVERSARY_DOWNLOAD_BASE:-https://github.com/adversarylabs/adversary/releases/download/${version}}"
+base="${ADVERSARY_DOWNLOAD_BASE:-https://github.com/doomerlabs/adversary/releases/download/${version}}"
 install_dir="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-cli-${version}"
 download_dir="${RUNNER_TEMP}/adversary-download-${version}"
 rm -rf -- "$install_dir" "$download_dir"
