@@ -99,7 +99,7 @@ grep -Fq 'changed=true' "$first_output"
 bump_sha="$(sed -n 's/^commit=//p' "$first_output")"
 [[ -n "$bump_sha" ]]
 [[ "$(git --git-dir="$remote" rev-parse main)" == "$bump_sha" ]]
-[[ "$(git --git-dir="$remote" log -1 --format=%s main)" == 'chore: bump adversary version to 0.0.2 [skip-ci]' ]]
+[[ "$(git --git-dir="$remote" log -1 --format=%s main)" == 'chore: bump doomer version to 0.0.2 [skip-ci]' ]]
 [[ "$(git --git-dir="$remote" show main:adversary.yaml | sed -n 's/^version:[[:space:]]*//p')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).version))')" == 0.0.2 ]]
 [[ "$(git --git-dir="$remote" show main:package-lock.json | node -e 'let data=""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => console.log(JSON.parse(data).packages[""].version))')" == 0.0.2 ]]

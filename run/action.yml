@@ -1,5 +1,5 @@
-name: Run Adversary
-description: Install the Adversary CLI and automatically select or explicitly run adversaries against a local repository.
+name: Run Doomer
+description: Install the Doomer CLI and automatically select or explicitly run adversaries against a local repository.
 
 inputs:
   adversaries:
@@ -7,9 +7,9 @@ inputs:
     required: false
     default: auto
   cli-version:
-    description: Exact Adversary CLI release tag to install.
+    description: Exact Doomer CLI release tag to install.
     required: false
-    default: 2026.9.18-beta.1
+    default: 2026.9.18
   path:
     description: Path to the source directory to review, relative to the workspace.
     required: false
@@ -131,9 +131,9 @@ inputs:
     required: false
     default: "false"
   api-url:
-    description: Adversary Labs API URL.
+    description: Doomer API URL.
     required: false
-    default: https://adversarylabs.ai/api
+    default: https://doomer.ai/api
   profile:
     description: CLI credential profile for auth-mode existing (and as a prefix for ephemeral OIDC/token/OAuth profiles). Owned authentication modes always use a unique action-owned profile that is removed after the step; existing/none never log out.
     required: false
@@ -147,7 +147,7 @@ inputs:
   client-name:
     description: Name shown while approving the OAuth device login.
     required: false
-    default: Adversary run action
+    default: Doomer run action
   registry-host:
     description: Optional OCI registry host override.
     required: false
@@ -157,7 +157,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: Exit code from adversary run (0 success, 1 findings, 2 usage, 3 execution failure, 4 network/auth), or 124 when timeout-minutes expires.
+    description: Exit code from doomer run (0 success, 1 findings, 2 usage, 3 execution failure, 4 network/auth), or 124 when timeout-minutes expires.
     value: ${{ steps.run.outputs.exit-code }}
   findings-count:
     description: Number of findings when format is json; empty for text output.
@@ -172,7 +172,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install Adversary CLI
+    - name: Install Doomer CLI
       shell: bash
       env:
         INPUT_CLI_VERSION: ${{ inputs.cli-version }}

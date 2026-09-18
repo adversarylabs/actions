@@ -1,11 +1,11 @@
-name: Push Adversary
-description: Validate, package, and push an adversary with a verified Adversary CLI release.
+name: Push Doomer
+description: Validate, package, and push an adversary with a verified Doomer CLI release.
 
 inputs:
   cli-version:
-    description: Exact Adversary CLI release tag to install.
+    description: Exact Doomer CLI release tag to install.
     required: false
-    default: 2026.9.18-beta.1
+    default: 2026.9.18
   path:
     description: Path to the adversary project, relative to the workspace.
     required: false
@@ -19,10 +19,10 @@ inputs:
     required: false
     default: "true"
   name:
-    description: Optional local artifact name override passed to adversary pack.
+    description: Optional local artifact name override passed to doomer pack.
     required: false
   remote-reference:
-    description: Optional fully qualified destination. When omitted, the authenticated Adversary Labs namespace is used.
+    description: Optional fully qualified destination. When omitted, the authenticated Doomer namespace is used.
     required: false
   repository-name:
     description: Optional nested repository path within registry-namespace. The packaged version is used as its tag. library/* is reserved for admin promotion. Cannot be combined with remote-reference.
@@ -32,9 +32,9 @@ inputs:
     required: false
     default: "false"
   api-url:
-    description: Adversary Labs API URL.
+    description: Doomer API URL.
     required: false
-    default: https://adversarylabs.ai/api
+    default: https://doomer.ai/api
   profile:
     description: CLI credential profile. Defaults to push-action for OIDC, token, and OAuth; existing mode uses the CLI default when omitted.
     required: false
@@ -48,7 +48,7 @@ inputs:
   client-name:
     description: Name shown while approving the OAuth device login.
     required: false
-    default: Adversary push action
+    default: Doomer push action
   registry-host:
     description: Optional OCI registry host override.
     required: false
@@ -73,16 +73,16 @@ outputs:
     description: Pushed latest reference when push-latest is enabled.
     value: ${{ steps.push.outputs.latest-reference }}
   namespace-signature-digest:
-    description: Platform-issued namespace signature referrer digest for an Adversary Labs private registry publish; empty for external or public repositories.
+    description: Platform-issued namespace signature referrer digest for an Doomer private registry publish; empty for external or public repositories.
     value: ${{ steps.push.outputs.namespace-signature-digest }}
   namespace-trust-digest:
-    description: Platform-endorsed namespace trust referrer digest for an Adversary Labs private registry publish; empty for external or public repositories.
+    description: Platform-endorsed namespace trust referrer digest for an Doomer private registry publish; empty for external or public repositories.
     value: ${{ steps.push.outputs.namespace-trust-digest }}
 
 runs:
   using: composite
   steps:
-    - name: Install Adversary CLI
+    - name: Install Doomer CLI
       shell: bash
       env:
         INPUT_CLI_VERSION: ${{ inputs.cli-version }}

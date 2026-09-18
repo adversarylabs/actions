@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
+api_url="${INPUT_API_URL:-https://doomer.ai/api}"
 team="${INPUT_REGISTRY_NAMESPACE:-}"
 operation="${OIDC_OPERATION:?OIDC_OPERATION is required}"
 output="${OIDC_OUTPUT:?OIDC_OUTPUT is required}"
@@ -28,7 +28,7 @@ chmod 600 "$oidc_response" "$exchange_response"
 
 curl --fail --silent --show-error \
   -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-  "${ACTIONS_ID_TOKEN_REQUEST_URL}${separator}audience=https%3A%2F%2Fadversarylabs.ai" \
+  "${ACTIONS_ID_TOKEN_REQUEST_URL}${separator}audience=https%3A%2F%2Fdoomer.ai" \
   >"$oidc_response"
 
 oidc_token="$(python3 - "$oidc_response" <<'PY'
@@ -75,9 +75,9 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 token = payload.get("token")
 namespace = payload.get("namespace")
 if not isinstance(token, str) or not token.startswith("adv_ci_"):
-    raise SystemExit("Adversary Labs returned an invalid CI access token")
+    raise SystemExit("Doomer returned an invalid CI access token")
 if not isinstance(namespace, str) or not namespace:
-    raise SystemExit("Adversary Labs returned an invalid registry namespace")
+    raise SystemExit("Doomer returned an invalid registry namespace")
 fd = os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, "w", encoding="utf-8") as stream:
     stream.write(token + "\n" + namespace + "\n")

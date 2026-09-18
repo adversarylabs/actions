@@ -18,7 +18,7 @@ if [[ ! -d "$project_path" ]]; then
   exit 2
 fi
 
-adversary validate "$project_path"
+doomer validate "$project_path"
 
 if [[ "$install_dependencies" == true && "$builder" == local ]]; then
   if [[ -f "$project_path/package-lock.json" ]]; then
@@ -44,17 +44,17 @@ fi
 pack_output="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-pack.json"
 pack_args=(pack "$project_path" --builder "$builder" --format json)
 if [[ -n "${INPUT_NAME:-}" ]]; then pack_args+=(--name "$INPUT_NAME"); fi
-adversary "${pack_args[@]}" >"$pack_output"
+doomer "${pack_args[@]}" >"$pack_output"
 
 local_reference="$(python3 - "$pack_output" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     envelope = json.load(stream)
 if envelope.get("command") != "pack" or not isinstance(envelope.get("data"), dict):
-    raise SystemExit("adversary pack returned an unexpected JSON envelope")
+    raise SystemExit("doomer pack returned an unexpected JSON envelope")
 value = envelope["data"].get("canonicalReference")
 if not isinstance(value, str) or not value:
-    raise SystemExit("adversary pack did not return a canonical reference")
+    raise SystemExit("doomer pack did not return a canonical reference")
 print(value)
 PY
 )"

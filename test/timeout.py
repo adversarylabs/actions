@@ -85,7 +85,7 @@ class TimeoutTest(unittest.TestCase):
         for sig, output_format in [(signal.SIGTERM, "text"), (signal.SIGINT, "json")]:
             with self.subTest(signal=sig), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                fake = root / "adversary"
+                fake = root / "doomer"
                 fake.write_text(f"#!{sys.executable}\n" + '''
 import os, signal, subprocess, sys, time
 from pathlib import Path

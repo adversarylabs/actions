@@ -13,8 +13,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.2.3"
-LATEST_API = "https://api.github.com/repos/doomerlabs/adversary/releases/latest"
-DOWNLOAD_BASE = f"https://github.com/doomerlabs/adversary/releases/download/{VERSION}"
+LATEST_API = "https://api.github.com/repos/doomerlabs/doomer/releases/latest"
+DOWNLOAD_BASE = f"https://github.com/doomerlabs/doomer/releases/download/{VERSION}"
 
 
 class InstallAuthTest(unittest.TestCase):
@@ -32,11 +32,11 @@ class InstallAuthTest(unittest.TestCase):
         os_name = {"Darwin": "darwin", "Linux": "linux"}[platform.system()]
         arch = {"x86_64": "amd64", "amd64": "amd64",
                 "arm64": "arm64", "aarch64": "arm64"}[platform.machine()]
-        self.archive_name = f"adversary_{VERSION}_{os_name}_{arch}.tar.gz"
+        self.archive_name = f"doomer_{VERSION}_{os_name}_{arch}.tar.gz"
         archive = self.directory / self.archive_name
         binary = b'#!/usr/bin/env bash\nprintf "adversary fixture\\n"\n'
         with tarfile.open(archive, "w:gz") as bundle:
-            info = tarfile.TarInfo("adversary")
+            info = tarfile.TarInfo("doomer")
             info.mode = 0o755
             info.size = len(binary)
             bundle.addfile(info, io.BytesIO(binary))
@@ -92,7 +92,7 @@ shutil.copyfile(root / responses[url], output)
                                 capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("adversary fixture", result.stdout)
-        installed = Path(github_path.read_text().strip()) / "adversary"
+        installed = Path(github_path.read_text().strip()) / "doomer"
         self.assertTrue(installed.is_file())
         for token in (github_token, gh_token):
             if token:
@@ -135,7 +135,7 @@ shutil.copyfile(root / responses[url], output)
         for api in (
             "https://api.github.com/repos/other/project/releases/latest",
             "https://api.github.com/repos/doomerlabs/other/releases/latest",
-            "https://api.github.com/repos/doomerlabs/adversary/issues",
+            "https://api.github.com/repos/doomerlabs/doomer/issues",
             f"{LATEST_API}/../latest",
             f"{LATEST_API}?redirect=other",
             f"{LATEST_API}#fragment",
@@ -149,10 +149,10 @@ shutil.copyfile(root / responses[url], output)
         for base in (
             f"https://github.com/other/project/releases/download/{VERSION}",
             f"https://github.com/doomerlabs/other/releases/download/{VERSION}",
-            "https://github.com/doomerlabs/adversary/releases/download/9.9.9",
+            "https://github.com/doomerlabs/doomer/releases/download/9.9.9",
             f"{DOWNLOAD_BASE}/../{VERSION}",
             f"{DOWNLOAD_BASE}/%2e%2e/{VERSION}",
-            f"https://github.com/doomerlabs/adversary/blob/main/{VERSION}",
+            f"https://github.com/doomerlabs/doomer/blob/main/{VERSION}",
         ):
             with self.subTest(base=base):
                 self.assertEqual(self.install(base=base),
@@ -165,8 +165,8 @@ shutil.copyfile(root / responses[url], output)
                        "http://github.com", "http://api.github.com", "file:///fixture"):
             with self.subTest(origin=origin):
                 self.assertEqual(self.install(
-                    api=f"{origin}/repos/doomerlabs/adversary/releases/latest",
-                    base=f"{origin}/doomerlabs/adversary/releases/download/{VERSION}",
+                    api=f"{origin}/repos/doomerlabs/doomer/releases/latest",
+                    base=f"{origin}/doomerlabs/doomer/releases/download/{VERSION}",
                 ), [[], [], []])
 
 

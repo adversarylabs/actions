@@ -1,6 +1,6 @@
 # Adversary Actions
 
-Reusable GitHub Actions for pushing and running Adversary Labs adversaries.
+Reusable GitHub Actions for pushing and running Doomer adversaries.
 
 | Action | Status | Purpose |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ During migration, do not create the tag until the version step succeeds. The bac
 
 ## Push an adversary
 
-The push action installs an Adversary CLI release, verifies the release archive against `checksums.txt`, validates the project, packages it, and pushes both the OCI image manifest and adversary-manifest referrer. Private publishes to the authenticated team namespace on the Adversary Labs registry are signed automatically; the publisher receives only the signature and public team delegation, never a private key.
+The push action installs a Doomer CLI release, verifies the release archive against `checksums.txt`, validates the project, packages it, and pushes both the OCI image manifest and adversary-manifest referrer. Private publishes to the authenticated team namespace on the Doomer registry are signed automatically; the publisher receives only the signature and public team delegation, never a private key.
 
 ```yaml
 name: Push adversary
@@ -110,15 +110,15 @@ jobs:
         run: echo "Pushed ${{ steps.push.outputs.reference }} at ${{ steps.push.outputs.digest }}"
 ```
 
-When `cli-version` is omitted, the action installs its pinned default, `2026.9.18-beta.1`. Set `cli-version` explicitly to test a different release. Pin the action itself to an exact release tag or full commit SHA for reproducible CI.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.18`. Set `cli-version` explicitly to test a different release. Pin the action itself to an exact release tag or full commit SHA for reproducible CI.
 
 The local builder installs dependencies from `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`; configure the matching Node runtime before invoking the action. pnpm and Yarn installs require Corepack, which is not bundled with Node.js 25 and later; install Corepack separately on those runtimes. For reproducible pnpm or Yarn installs, pin the exact tool version in the `packageManager` field of `package.json`.
 
 ### Authentication
 
-The default `auth-mode: auto` requests the job identity with audience `https://adversarylabs.ai`, exchanges it for a ten-minute team credential, and deletes the temporary CLI profile afterward. Add `permissions: id-token: write`, trust the repository under the team page, and pass the team slug as `registry-namespace`. This works both in GitHub Actions and native Depot CI workflows; Depot identities can also be pinned to the Depot organization ID. For v1 compatibility, `auto` selects token authentication when the `token` input is populated; explicit `oidc` never falls back to a long-lived token.
+The default `auth-mode: auto` requests the job identity with audience `https://doomer.ai`, exchanges it for a ten-minute team credential, and deletes the temporary CLI profile afterward. Add `permissions: id-token: write`, trust the repository under the team page, and pass the team slug as `registry-namespace`. This works both in GitHub Actions and native Depot CI workflows; Depot identities can also be pinned to the Depot organization ID. For v1 compatibility, `auto` selects token authentication when the `token` input is populated; explicit `oidc` never falls back to a long-lived token.
 
-For CI systems without compatible OIDC, `auth-mode: token` accepts an Adversary Labs service-account token. Create one with `registry:push`, store it as a CI secret, and pass it through the `token` input.
+For CI systems without compatible OIDC, `auth-mode: token` accepts an Doomer service-account token. Create one with `registry:push`, store it as a CI secret, and pass it through the `token` input.
 
 For an interactive run, set `auth-mode: oauth`. The CLI prints a device-login URL and code and waits for approval through your normal OAuth login. The device request currently expires after ten minutes.
 
@@ -127,7 +127,7 @@ Set `auth-mode: existing` to skip login. This supports a runner with a preconfig
 ```yaml
 - uses: doomerlabs/actions/push@v1
   with:
-    cli-version: 2026.7.9-beta.1
+    cli-version: 2026.9.18
     auth-mode: existing
     remote-reference: ghcr.io/acme/dockerfile:0.1.0
 ```
@@ -138,7 +138,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `cli-version` | no | `2026.9.18-beta.1` | Exact Adversary CLI release tag. |
+| `cli-version` | no | `2026.9.18` | Exact Doomer CLI release tag. |
 | `path` | no | `.` | Adversary project directory. |
 | `builder` | no | `local` | `local` or `docker` package builder. |
 | `install-dependencies` | no | `true` | Install dependencies from a supported lockfile before local packaging. Set to `false` when already installed; ignored by the Docker builder. |
@@ -150,7 +150,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 | `profile` | no | `push-action` for token/OAuth; CLI default for existing | CLI credential profile. |
 | `auth-mode` | no | `auto` | `auto` uses a supplied token or otherwise OIDC; `oidc` requires GitHub Actions or Depot CI identity; `token`, `oauth`, and `existing` select those explicit flows. |
 | `token` | with token auth | — | Service-account token supplied through a CI secret. For v1 compatibility, supplying it without `auth-mode` selects token auth. |
-| `client-name` | no | `Adversary push action` | Name shown on the OAuth device-approval screen. |
+| `client-name` | no | `Doomer push action` | Name shown on the OAuth device-approval screen. |
 | `registry-host` | no | — | Registry host override. |
 | `registry-namespace` | with token auth* | — | Team registry namespace. May be omitted when `remote-reference` is explicit. |
 
@@ -168,7 +168,7 @@ For hosted pushes, `repository-name` overrides the remote name independently of 
 
 ## Run adversaries
 
-The run action installs an Adversary CLI release, optionally authenticates for registry pulls, and executes `adversary run` against the checked-out source. Pull-request runs default to the PR diff, automatically post findings as a submitted GitHub review, and do not fail the check merely because findings exist. Configuration, authentication, network, and execution failures still fail the step. The action pulls accessible adversaries, detects which ones match the change, and runs the selected set. Set `adversaries` to one or more references to run an explicit set instead, or set `all-files: true` to review the entire repository. OIDC pulls from the Adversary Labs registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
+The run action installs a Doomer CLI release, optionally authenticates for registry pulls, and executes `doomer run` against the checked-out source. Pull-request runs default to the PR diff, automatically post findings as a submitted GitHub review, and do not fail the check merely because findings exist. Configuration, authentication, network, and execution failures still fail the step. The action pulls accessible adversaries, detects which ones match the change, and runs the selected set. Set `adversaries` to one or more references to run an explicit set instead, or set `all-files: true` to review the entire repository. OIDC pulls from the Doomer registry fetch and verify the public team delegation automatically, so a valid hosted private signature can use host execution without the unsafe override. External copies such as GHCR remain untrusted. It supports model-backed adversaries through provider inputs and secrets. Use the same composite action from GitHub Actions or Depot CI (`runs-on: depot-ubuntu-latest`).
 
 ```yaml
 name: Adversary review
@@ -208,13 +208,13 @@ jobs:
           echo "findings=${{ steps.review.outputs.findings-count }}"
 ```
 
-When `cli-version` is omitted, the action installs its pinned default, `2026.9.18-beta.1`. Set `cli-version` explicitly to test a different release, and pin the action ref for reproducible CI. `path` defaults to `.`.
+When `cli-version` is omitted, the action installs its pinned default, `2026.9.18`. Set `cli-version` explicitly to test a different release, and pin the action ref for reproducible CI. `path` defaults to `.`.
 
 ### Artifact cache
 
 The action stores pulled adversaries in a content-addressed repository under `data-dir`. It still checks the remote catalog and resolves each OCI reference on every run; when the resolved digest is already present, the CLI reuses the local artifact without downloading its layers and verifies it before execution. `data-dir` defaults to `${RUNNER_TEMP}/adversary-data`, and an existing `ADVERSARY_DATA_DIR` environment value remains supported when the input is omitted.
 
-Cache only this artifact directory. Adversary Labs credentials use the operating system's separate configuration directory and are not written beneath `data-dir`. The artifact cache does contain the complete contents of private adversaries, so scope access to jobs that are authorized to pull those packages.
+Cache only this artifact directory. Doomer credentials use the operating system's separate configuration directory and are not written beneath `data-dir`. The artifact cache does contain the complete contents of private adversaries, so scope access to jobs that are authorized to pull those packages.
 
 Depot CI can persist the directory with a durable cache disk. Use a repository-specific disk name unless cross-repository sharing is intentional:
 
@@ -223,12 +223,12 @@ Depot CI can persist the directory with a durable cache disk. Use a repository-s
   uses: depot/cache-mount@v1
   with:
     name: adversary-${{ github.event.repository.id }}-v1
-    path: /mnt/adversary
+    path: /mnt/doomer
 
 - name: Run adversaries
   uses: doomerlabs/actions/run@v1
   with:
-    data-dir: /mnt/adversary
+    data-dir: /mnt/doomer
     adversaries: auto
     auth-mode: oidc
     registry-namespace: your-team-slug
@@ -293,7 +293,7 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
 | `adversaries` | no | `auto` | `auto` to pull and select matching accessible adversaries, or one or more explicit refs (whitespace or newlines). |
-| `cli-version` | no | `2026.9.18-beta.1` | Exact Adversary CLI release tag. |
+| `cli-version` | no | `2026.9.18` | Exact Doomer CLI release tag. |
 | `path` | no | `.` | Source directory to review. |
 | `data-dir` | no | `${RUNNER_TEMP}/adversary-data` | Absolute directory containing cacheable adversary artifacts. `ADVERSARY_DATA_DIR` is used as a fallback when set. |
 | `base` | no | — | Git base ref for change detection. |
@@ -332,7 +332,7 @@ The entire review command has a 10-minute wall-clock deadline, including registr
 | `profile` | no | ephemeral `run-action-<id>` for token/OAuth; CLI default otherwise | For `existing`, the CLI profile to use (never logged out). For token/OAuth, used only as a name prefix for a unique action-owned profile that is removed after the step. |
 | `auth-mode` | no | `none` | `none`, `oidc`, `token`, `oauth`, or `existing`. |
 | `token` | with token auth | — | Pull-scoped service-account token secret. |
-| `client-name` | no | `Adversary run action` | Name shown on the OAuth device-approval screen. |
+| `client-name` | no | `Doomer run action` | Name shown on the OAuth device-approval screen. |
 | `registry-host` | no | — | Registry host override. |
 | `registry-namespace` | no | — | Team registry namespace for service-account login. |
 
@@ -363,4 +363,4 @@ Run the deterministic shell test suite locally:
 bash test/test.sh
 ```
 
-The tests use a local release archive and a fake CLI; they do not contact Adversary Labs or push artifacts.
+The tests use a local release archive and a fake CLI; they do not contact Doomer or push artifacts.

@@ -34,13 +34,13 @@ credential="$tmp/credential"
 PATH="$tmp/bin:$PATH" FAKE_LOG="$fake_log" RUNNER_TEMP="$tmp/runner" \
   ACTIONS_ID_TOKEN_REQUEST_URL='https://identity.example/token?job=1' \
   ACTIONS_ID_TOKEN_REQUEST_TOKEN='request-secret' \
-  INPUT_API_URL='https://adversarylabs.ai/api' INPUT_REGISTRY_NAMESPACE=acme \
+  INPUT_API_URL='https://doomer.ai/api' INPUT_REGISTRY_NAMESPACE=acme \
   OIDC_OPERATION=push OIDC_OUTPUT="$credential" bash "$root/scripts/oidc.sh"
 
 [[ "$(sed -n '1p' "$credential")" == adv_ci_short-lived ]]
 [[ "$(sed -n '2p' "$credential")" == acme ]]
-grep -Fq 'audience=https%3A%2F%2Fadversarylabs.ai' "$fake_log"
-grep -Fq 'https://adversarylabs.ai/api/v1/auth/ci/exchange' "$fake_log"
+grep -Fq 'audience=https%3A%2F%2Fdoomer.ai' "$fake_log"
+grep -Fq 'https://doomer.ai/api/v1/auth/ci/exchange' "$fake_log"
 
 if PATH="$tmp/bin:$PATH" RUNNER_TEMP="$tmp/runner" \
   INPUT_REGISTRY_NAMESPACE=acme OIDC_OPERATION=pull OIDC_OUTPUT="$credential" \

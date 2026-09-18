@@ -3,9 +3,9 @@ set -euo pipefail
 
 local_reference="${INPUT_LOCAL_REFERENCE:?local package reference is required}"
 profile="${INPUT_PROFILE:-}"
-api_url="${INPUT_API_URL:-https://adversarylabs.ai/api}"
+api_url="${INPUT_API_URL:-https://doomer.ai/api}"
 auth_mode="${INPUT_AUTH_MODE:-auto}"
-client_name="${INPUT_CLIENT_NAME:-Adversary push action}"
+client_name="${INPUT_CLIENT_NAME:-Doomer push action}"
 token="${INPUT_TOKEN:-}"
 remote_reference="${INPUT_REMOTE_REFERENCE:-}"
 repository_name="${INPUT_REPOSITORY_NAME:-}"
@@ -90,7 +90,7 @@ credential_file=""
 cleanup_auth() {
   if [[ -n "${credential_file:-}" ]]; then rm -f "$credential_file"; fi
   if [[ "${owns_temp_profile:-false}" == true && -n "${profile:-}" ]]; then
-    adversary --profile "$profile" logout --local-only >/dev/null 2>&1 || true
+    doomer --profile "$profile" logout --local-only >/dev/null 2>&1 || true
   fi
 }
 trap cleanup_auth EXIT
@@ -111,7 +111,7 @@ if [[ "$auth_mode" == oidc ]]; then
   [[ "$token" == adv_ci_* && "$namespace" == "${INPUT_REGISTRY_NAMESPACE:-}" ]] || {
     echo "OIDC exchange returned unexpected credentials" >&2; exit 4;
   }
-  printf '%s\n' "$token" | adversary --profile "$profile" login --token-stdin --registry-namespace "$namespace"
+  printf '%s\n' "$token" | doomer --profile "$profile" login --token-stdin --registry-namespace "$namespace"
   token=''
 elif [[ "$auth_mode" == token ]]; then
   if [[ -z "$token" ]]; then
@@ -119,7 +119,7 @@ elif [[ "$auth_mode" == token ]]; then
     exit 2
   fi
   if [[ "$token" != adv_sa_* ]]; then
-    echo "token must be an Adversary Labs service account token" >&2
+    echo "token must be an Doomer service account token" >&2
     exit 2
   fi
   if [[ -z "${INPUT_REGISTRY_NAMESPACE:-}" && -z "$remote_reference" ]]; then
@@ -128,19 +128,19 @@ elif [[ "$auth_mode" == token ]]; then
   fi
   login_args=(--profile "$profile" login --token-stdin)
   if [[ -n "${INPUT_REGISTRY_NAMESPACE:-}" ]]; then login_args+=(--registry-namespace "$INPUT_REGISTRY_NAMESPACE"); fi
-  printf '%s\n' "$token" | adversary "${login_args[@]}"
+  printf '%s\n' "$token" | doomer "${login_args[@]}"
   token=''
 elif [[ "$auth_mode" == oauth ]]; then
-  adversary --profile "$profile" login --ci --name "$client_name"
+  doomer --profile "$profile" login --ci --name "$client_name"
 fi
 
 push_output="${RUNNER_TEMP:?RUNNER_TEMP is required}/adversary-push.json"
 push_args=(push "$local_reference" --format json)
 if [[ -n "$remote_reference" ]]; then push_args=(push "$local_reference" "$remote_reference" --format json); fi
 if [[ -n "$profile" ]]; then
-  adversary --profile "$profile" "${push_args[@]}" >"$push_output"
+  doomer --profile "$profile" "${push_args[@]}" >"$push_output"
 else
-  adversary "${push_args[@]}" >"$push_output"
+  doomer "${push_args[@]}" >"$push_output"
 fi
 
 push_values="${RUNNER_TEMP}/adversary-push-values"
@@ -149,17 +149,17 @@ import json, sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     envelope = json.load(stream)
 if envelope.get("command") != "push" or not isinstance(envelope.get("data"), dict):
-    raise SystemExit("adversary push returned an unexpected JSON envelope")
+    raise SystemExit("doomer push returned an unexpected JSON envelope")
 data = envelope["data"]
 for key in ("canonicalReference", "digest", "manifestDigest"):
     value = data.get(key)
     if not isinstance(value, str) or not value:
-        raise SystemExit(f"adversary push did not return {key}")
+        raise SystemExit(f"doomer push did not return {key}")
     print(value)
 for key in ("namespaceSignatureDigest", "namespaceTrustDigest"):
     value = data.get(key, "")
     if not isinstance(value, str):
-        raise SystemExit(f"adversary push returned invalid {key}")
+        raise SystemExit(f"doomer push returned invalid {key}")
     print(value)
 PY
 reference="$(sed -n '1p' "$push_values")"
@@ -168,7 +168,7 @@ manifest_digest="$(sed -n '3p' "$push_values")"
 namespace_signature_digest="$(sed -n '4p' "$push_values")"
 namespace_trust_digest="$(sed -n '5p' "$push_values")"
 if [[ -z "$reference" || -z "$digest" || -z "$manifest_digest" || "$(wc -l <"$push_values" | tr -d ' ')" != 5 ]]; then
-  echo "adversary push returned incomplete metadata" >&2
+  echo "doomer push returned incomplete metadata" >&2
   exit 3
 fi
 
@@ -190,9 +190,9 @@ PY
   latest_output="${RUNNER_TEMP}/adversary-push-latest.json"
   latest_args=(push "$local_reference" "$latest_reference" --format json)
   if [[ -n "$profile" ]]; then
-    adversary --profile "$profile" "${latest_args[@]}" >"$latest_output"
+    doomer --profile "$profile" "${latest_args[@]}" >"$latest_output"
   else
-    adversary "${latest_args[@]}" >"$latest_output"
+    doomer "${latest_args[@]}" >"$latest_output"
   fi
   python3 - "$latest_output" "$latest_reference" "$digest" "$manifest_digest" <<'PY'
 import json
@@ -202,11 +202,11 @@ with open(sys.argv[1], encoding="utf-8") as stream:
     envelope = json.load(stream)
 data = envelope.get("data")
 if envelope.get("command") != "push" or not isinstance(data, dict):
-    raise SystemExit("adversary latest push returned an unexpected JSON envelope")
+    raise SystemExit("doomer latest push returned an unexpected JSON envelope")
 if data.get("canonicalReference") != sys.argv[2]:
-    raise SystemExit("adversary latest push returned an unexpected canonical reference")
+    raise SystemExit("doomer latest push returned an unexpected canonical reference")
 if data.get("digest") != sys.argv[3] or data.get("manifestDigest") != sys.argv[4]:
-    raise SystemExit("adversary latest push returned different digests")
+    raise SystemExit("doomer latest push returned different digests")
 PY
 fi
 

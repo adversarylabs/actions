@@ -84,7 +84,7 @@ git fetch --no-tags origin "$branch"
 scrub_git_credentials
 tag_sha="$(git rev-parse "${GITHUB_SHA:?GITHUB_SHA is required}^{commit}")"
 branch_sha="$(git rev-parse "origin/${branch}")"
-message="chore: bump adversary version to ${version} [skip-ci]"
+message="chore: bump doomer version to ${version} [skip-ci]"
 changed=false
 commit="$branch_sha"
 
