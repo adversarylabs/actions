@@ -13,7 +13,7 @@ grep -Fq 'using: composite' "$root/push/action.yml"
 grep -Fq 'cli-version:' "$root/push/action.yml"
 cli_version_input="$(sed -n '/^  cli-version:/,/^  path:/p' "$root/push/action.yml")"
 grep -Fq 'required: false' <<<"$cli_version_input"
-grep -Fq 'default: 2026.9.19.2' <<<"$cli_version_input"
+grep -Fq 'default: 2026.9.20-beta.1' <<<"$cli_version_input"
 if grep -Fq 'required: true' <<<"$cli_version_input"; then
   echo "cli-version is still required" >&2
   exit 1
@@ -312,6 +312,7 @@ if PATH="$fake_bin:$PATH" RUNNER_TEMP="$runner" GITHUB_OUTPUT="$push_output" \
 fi
 
 echo "push action tests passed"
+bash "$root/test/install-defaults.sh"
 bash "$root/test/runtime-version.sh"
 bash "$root/test/version.sh"
 bash "$root/test/run.sh"
