@@ -49,7 +49,7 @@ if [[ -n "$repository_name" ]]; then
     echo "the library namespace is reserved for catalog promotion" >&2
     exit 2
   fi
-  registry_host="${INPUT_REGISTRY_HOST:-registry.adversarylabs.ai}"
+  registry_host="${INPUT_REGISTRY_HOST:-registry.doomer.ai}"
   if [[ -z "$registry_host" || "$registry_host" == *://* || "$registry_host" == */* ]]; then
     echo "registry-host must be a registry hostname without a URL scheme or path" >&2
     exit 2
